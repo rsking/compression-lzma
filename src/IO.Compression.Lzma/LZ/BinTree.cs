@@ -9,7 +9,7 @@ namespace System.IO.Compression.LZ;
 /// <summary>
 /// The BIN tree.
 /// </summary>
-internal class BinTree : InWindow, IMatchFinder
+internal sealed class BinTree : InWindow, IMatchFinder
 {
     private const uint Hash2Size = 1U << 10;
     private const uint Hash3Size = 1U << 16;

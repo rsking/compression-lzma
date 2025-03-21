@@ -9,7 +9,7 @@ namespace System.IO.Compression.Common;
 /// <summary>
 /// The CRC.
 /// </summary>
-internal class Crc
+internal sealed class Crc
 {
     /// <summary>
     /// The CRC table.

@@ -9,7 +9,7 @@ namespace System.IO.Compression.RangeCoder;
 /// <summary>
 /// The range decoder.
 /// </summary>
-internal class RangeDecoder
+internal sealed class RangeDecoder
 {
     /// <summary>
     /// The top value.
