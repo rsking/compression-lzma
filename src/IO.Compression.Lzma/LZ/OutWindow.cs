@@ -11,9 +11,8 @@ namespace System.IO.Compression.LZ;
 /// </summary>
 internal class OutWindow
 {
-    private byte[]? buffer;
+    private byte[] buffer = [];
     private uint pos;
-    private uint windowSize;
     private uint streamPos;
     private Stream? stream;
 
@@ -28,12 +27,11 @@ internal class OutWindow
     /// <param name="windowSize">The window size.</param>
     public void Create(uint windowSize)
     {
-        if (this.windowSize != windowSize)
+        if (this.buffer.Length != windowSize)
         {
             this.buffer = new byte[windowSize];
         }
 
-        this.windowSize = windowSize;
         this.pos = 0;
         this.streamPos = 0;
     }
@@ -49,9 +47,7 @@ internal class OutWindow
         this.stream = stream;
         if (!solid)
         {
-            this.streamPos = 0;
-            this.pos = 0;
-            this.TrainSize = 0;
+            this.streamPos = this.pos = this.TrainSize = 0U;
         }
     }
 
@@ -63,13 +59,13 @@ internal class OutWindow
     public bool Train(Stream stream)
     {
         var len = stream.Length;
-        var size = len < this.windowSize ? (uint)len : this.windowSize;
+        var size = (uint)Math.Min(len, this.buffer.Length);
         this.TrainSize = size;
         stream.Position = len - size;
         this.streamPos = this.pos = 0U;
-        while (size > 0)
+        while (size > 0U)
         {
-            var curSize = this.windowSize - this.pos;
+            var curSize = (uint)this.buffer.Length - this.pos;
             if (size < curSize)
             {
                 curSize = size;
@@ -84,9 +80,9 @@ internal class OutWindow
             size -= numReadBytes;
             this.pos += numReadBytes;
             this.streamPos += numReadBytes;
-            if (this.pos == this.windowSize)
+            if (this.pos == this.buffer.Length)
             {
-                this.streamPos = this.pos = 0;
+                this.streamPos = this.pos = 0U;
             }
         }
 
@@ -119,7 +115,7 @@ internal class OutWindow
         }
 
         this.stream.Write(this.buffer, (int)this.streamPos, (int)size);
-        if (this.pos >= this.windowSize)
+        if (this.pos >= this.buffer.Length)
         {
             this.pos = 0;
         }
@@ -135,25 +131,20 @@ internal class OutWindow
     public void CopyBlock(uint distance, uint length)
     {
         var currentPosition = this.pos - distance - 1;
-        if (currentPosition >= this.windowSize)
+        if (currentPosition >= this.buffer.Length)
         {
-            currentPosition += this.windowSize;
-        }
-
-        if (this.buffer is null)
-        {
-            throw new InvalidOperationException();
+            currentPosition += (uint)this.buffer.Length;
         }
 
         for (; length > 0; length--)
         {
-            if (currentPosition >= this.windowSize)
+            if (currentPosition >= this.buffer.Length)
             {
-                currentPosition = 0;
+                currentPosition = 0U;
             }
 
             this.buffer[this.pos++] = this.buffer[currentPosition++];
-            if (this.pos >= this.windowSize)
+            if (this.pos >= this.buffer.Length)
             {
                 this.Flush();
             }
@@ -172,7 +163,7 @@ internal class OutWindow
         }
 
         this.buffer[this.pos++] = b;
-        if (this.pos >= this.windowSize)
+        if (this.pos >= this.buffer.Length)
         {
             this.Flush();
         }
@@ -191,9 +182,9 @@ internal class OutWindow
         }
 
         var currentPosition = this.pos - distance - 1;
-        if (currentPosition >= this.windowSize)
+        if (currentPosition >= this.buffer.Length)
         {
-            currentPosition += this.windowSize;
+            currentPosition += (uint)this.buffer.Length;
         }
 
         return this.buffer[currentPosition];
