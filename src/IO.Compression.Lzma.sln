@@ -1,6 +1,5 @@
-﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# 17
+# Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IO.Compression.Lzma", "IO.Compression.Lzma\IO.Compression.Lzma.csproj", "{AA632210-4012-49D3-904F-BADA89B59AE6}"
@@ -8,6 +7,13 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Test", "Test", "{33007D5E-2946-4DB1-B21B-A4143926583D}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IO.Compression.Lzma.Tests", "Tests\IO.Compression.Lzma.Tests\IO.Compression.Lzma.Tests.csproj", "{A14747DB-7ACD-4105-875B-4ECB9AEDBF8E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Lmza.Cli", "Lmza.Cli\Lmza.Cli.csproj", "{10AE216B-8672-429D-B4A1-B47D9193E492}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9EA26BF3-B72F-4E88-BDC1-4455EFCB6642}"
+	ProjectSection(SolutionItems) = preProject
+		nuget.config = nuget.config
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,6 +29,10 @@ Global
 		{A14747DB-7ACD-4105-875B-4ECB9AEDBF8E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A14747DB-7ACD-4105-875B-4ECB9AEDBF8E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A14747DB-7ACD-4105-875B-4ECB9AEDBF8E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{10AE216B-8672-429D-B4A1-B47D9193E492}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{10AE216B-8672-429D-B4A1-B47D9193E492}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{10AE216B-8672-429D-B4A1-B47D9193E492}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{10AE216B-8672-429D-B4A1-B47D9193E492}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

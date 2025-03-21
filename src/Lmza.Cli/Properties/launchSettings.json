@@ -1,0 +1,20 @@
+{
+  "profiles": {
+    "help": {
+      "commandName": "Project",
+      "commandLineArgs": "encode --help"
+    },
+    "encode": {
+      "commandName": "Project",
+      "commandLineArgs": "encode $(SolutionDir)/Tests/lorem-ipsum.txt $(SolutionDir)/output/lorem-ipsum.lzma"
+    },
+    "decode": {
+      "commandName": "Project",
+      "commandLineArgs": "decode $(SolutionDir)/output/lorem-ipsum.lzma $(SolutionDir)/output/lorem-ipsum.txt"
+    },
+    "benchmark": {
+      "commandName": "Project",
+      "commandLineArgs": "benchmark"
+    }
+  }
+}

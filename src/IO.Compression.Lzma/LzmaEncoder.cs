@@ -403,14 +403,14 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
     }
 
     /// <inheritdoc/>
-    public void SetCoderProperties(CoderPropID[] propIDs, object[] properties)
+    public void SetCoderProperties(CoderPropId[] propIDs, object[] properties)
     {
         for (var i = 0; i < properties.Length; i++)
         {
             var prop = properties[i];
             switch (propIDs[i])
             {
-                case CoderPropID.NumFastBytes:
+                case CoderPropId.NumFastBytes:
                     if (prop is not int)
                     {
                         throw new InvalidDataException();
@@ -425,9 +425,9 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
                     this.numFastBytes = (uint)propertyNumFastBytes;
                     break;
 
-                case CoderPropID.Algorithm:
+                case CoderPropId.Algorithm:
                     break;
-                case CoderPropID.MatchFinder:
+                case CoderPropId.MatchFinder:
                     if (prop is not string stringProp)
                     {
                         throw new InvalidDataException();
@@ -449,7 +449,7 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
 
                     break;
 
-                case CoderPropID.DictionarySize:
+                case CoderPropId.DictionarySize:
                     const int DicLogSizeMaxCompress = 30;
                     if (prop is not int dictionarySizeProp)
                     {
@@ -475,7 +475,7 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
                     this.distTableSize = (uint)dicLogSize * 2;
                     break;
 
-                case CoderPropID.PosStateBits:
+                case CoderPropId.PosStateBits:
                     if (prop is not int posStateBitsProp)
                     {
                         throw new InvalidDataException();
@@ -490,7 +490,7 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
                     this.posStateMask = (1U << this.posStateBits) - 1;
                     break;
 
-                case CoderPropID.LitPosBits:
+                case CoderPropId.LitPosBits:
                     if (prop is not int numLiteralPosStateBitsProp)
                     {
                         throw new InvalidDataException();
@@ -504,7 +504,7 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
                     this.numLiteralPosStateBits = numLiteralPosStateBitsProp;
                     break;
 
-                case CoderPropID.LitContextBits:
+                case CoderPropId.LitContextBits:
                     if (prop is not int numLiteralContextBitsProp)
                     {
                         throw new InvalidDataException();
@@ -518,7 +518,7 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
                     this.numLiteralContextBits = numLiteralContextBitsProp;
                     break;
 
-                case CoderPropID.EndMarker:
+                case CoderPropId.EndMarker:
                     if (prop is not bool boolProp)
                     {
                         throw new InvalidDataException();
@@ -585,15 +585,13 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
     {
         if (this.matchFinder is null)
         {
-            var bt = new LZ.BinTree();
-            var numHashBytes = 4;
-            if (this.matchFinderType is EMatchFinderType.BT2)
+            var numHashBytes = this.matchFinderType switch
             {
-                numHashBytes = 2;
-            }
+                EMatchFinderType.BT2 => 2,
+                _ => 4,
+            };
 
-            bt.SetType(numHashBytes);
-            this.matchFinder = bt;
+            this.matchFinder = new LZ.BinTree(numHashBytes);
         }
 
         this.literalEncoder.Create(this.numLiteralPosStateBits, this.numLiteralContextBits);

@@ -1,17 +1,20 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <LangVersion>latest</LangVersion>
-    <RootNamespace>System.IO.Compression</RootNamespace>
-    <AssemblyName>KingR.$(AssemblyName)</AssemblyName>
+    <AssemblyName>lzma</AssemblyName>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
     <AdditionalFiles Include="$([MSBuild]::GetPathOfFileAbove('stylecop.json'))" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.24324.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -34,8 +37,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="$(AssemblyName).Tests"/>
-    <InternalsVisibleTo Include="lzma"/>
+    <ProjectReference Include="..\IO.Compression.Lzma\IO.Compression.Lzma.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.CommandLine"/>
   </ItemGroup>
 
 </Project>

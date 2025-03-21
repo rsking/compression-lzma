@@ -16,5 +16,5 @@ internal interface ISetCoderProperties
     /// </summary>
     /// <param name="propIDs">The property IDs.</param>
     /// <param name="properties">The properties.</param>
-    void SetCoderProperties(CoderPropID[] propIDs, object[] properties);
+    void SetCoderProperties(CoderPropId[] propIDs, object[] properties);
 }

@@ -19,6 +19,12 @@ internal class BinTree : InWindow, IMatchFinder
     private const uint EmptyHashValue = default;
     private const uint MaxValForNormalize = (1U << 31) - 1U;
 
+    private readonly bool hashArray = true;
+
+    private readonly uint numHashDirectBytes;
+    private readonly uint minMatchCheck;
+    private readonly uint fixHashSize;
+
     private uint cyclicBufferPos;
     private uint cyclicBufferSize;
     private uint matchMaxLen;
@@ -30,30 +36,24 @@ internal class BinTree : InWindow, IMatchFinder
     private uint hashMask;
     private uint hashSizeSum;
 
-    private bool hashArray = true;
-
-    private uint numHashDirectBytes;
-    private uint minMatchCheck = 4U;
-    private uint fixHashSize = Hash2Size + Hash3Size;
-
     /// <summary>
-    /// Sets the type.
+    /// Initializes a new instance of the <see cref="BinTree"/> class.
     /// </summary>
     /// <param name="numHashBytes">The number of hash bytes.</param>
-    public void SetType(int numHashBytes)
+    public BinTree(int numHashBytes)
     {
         this.hashArray = numHashBytes > 2;
         if (this.hashArray)
         {
-            this.numHashDirectBytes = 0;
-            this.minMatchCheck = 4;
+            this.numHashDirectBytes = 0U;
+            this.minMatchCheck = 4U;
             this.fixHashSize = Hash2Size + Hash3Size;
         }
         else
         {
-            this.numHashDirectBytes = 2;
-            this.minMatchCheck = 2 + 1;
-            this.fixHashSize = 0;
+            this.numHashDirectBytes = 2U;
+            this.minMatchCheck = 2U + 1U;
+            this.fixHashSize = 0U;
         }
     }
 
