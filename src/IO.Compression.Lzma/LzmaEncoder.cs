@@ -29,7 +29,7 @@ public class LzmaEncoder
     private readonly uint[] repDistances = new uint[NumRepDistances];
 
     private readonly Optimal[] optimum = new Optimal[NumOpts];
-    private readonly RangeCoder.Encoder rangeEncoder = new();
+    private readonly RangeCoder.RangeEncoder rangeEncoder = new();
 
     private readonly RangeCoder.BitEncoder[] matchEncoders = new RangeCoder.BitEncoder[NumStates << NumPosStatesBitsMax];
     private readonly RangeCoder.BitEncoder[] repEncoders = new RangeCoder.BitEncoder[NumStates];
@@ -1493,7 +1493,7 @@ public class LzmaEncoder
                 }
             }
 
-            public readonly void Encode(RangeCoder.Encoder rangeEncoder, byte symbol)
+            public readonly void Encode(RangeCoder.RangeEncoder rangeEncoder, byte symbol)
             {
                 var context = 1U;
                 for (var i = 7; i >= 0; i--)
@@ -1504,7 +1504,7 @@ public class LzmaEncoder
                 }
             }
 
-            public readonly void EncodeMatched(RangeCoder.Encoder rangeEncoder, byte matchByte, byte symbol)
+            public readonly void EncodeMatched(RangeCoder.RangeEncoder rangeEncoder, byte matchByte, byte symbol)
             {
                 var context = 1U;
                 var same = true;
@@ -1587,7 +1587,7 @@ public class LzmaEncoder
             this.highCoder.Init();
         }
 
-        public void Encode(RangeCoder.Encoder rangeEncoder, uint symbol, uint posState)
+        public void Encode(RangeCoder.RangeEncoder rangeEncoder, uint symbol, uint posState)
         {
             if (symbol < NumLowLenSymbols)
             {
@@ -1668,7 +1668,7 @@ public class LzmaEncoder
             }
         }
 
-        public new void Encode(RangeCoder.Encoder rangeEncoder, uint symbol, uint posState)
+        public new void Encode(RangeCoder.RangeEncoder rangeEncoder, uint symbol, uint posState)
         {
             base.Encode(rangeEncoder, symbol, posState);
             if (--this.counters[posState] is 0U)

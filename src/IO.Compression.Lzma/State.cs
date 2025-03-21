@@ -16,11 +16,6 @@ internal struct State
     /// </summary>
     public uint Index;
 
-    public State()
-    {
-        this.Index = default;
-    }
-
     /// <summary>
     /// Updates the character.
     /// </summary>

@@ -50,14 +50,14 @@ internal struct BitDecoder
     /// </summary>
     /// <param name="rangeDecoder">The range decoder.</param>
     /// <returns>The decoded value.</returns>
-    public uint Decode(Decoder rangeDecoder)
+    public uint Decode(RangeDecoder rangeDecoder)
     {
         var newBound = (rangeDecoder.Range >> NumBitModelTotalBits) * this.probability;
         if (rangeDecoder.Code < newBound)
         {
             rangeDecoder.Range = newBound;
             this.probability += (BitModelTotal - this.probability) >> NumMoveBits;
-            if (rangeDecoder.Range < Decoder.TopValue && rangeDecoder.Stream is not null)
+            if (rangeDecoder.Range < RangeDecoder.TopValue && rangeDecoder.Stream is not null)
             {
                 rangeDecoder.Code = (rangeDecoder.Code << 8) | (byte)rangeDecoder.Stream.ReadByte();
                 rangeDecoder.Range <<= 8;
@@ -69,7 +69,7 @@ internal struct BitDecoder
         rangeDecoder.Range -= newBound;
         rangeDecoder.Code -= newBound;
         this.probability -= this.probability >> NumMoveBits;
-        if (rangeDecoder.Range < Decoder.TopValue && rangeDecoder.Stream is not null)
+        if (rangeDecoder.Range < RangeDecoder.TopValue && rangeDecoder.Stream is not null)
         {
             rangeDecoder.Code = (rangeDecoder.Code << 8) | (byte)rangeDecoder.Stream.ReadByte();
             rangeDecoder.Range <<= 8;

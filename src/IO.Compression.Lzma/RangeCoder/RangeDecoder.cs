@@ -1,5 +1,5 @@
 ﻿// -----------------------------------------------------------------------
-// <copyright file="Decoder.cs" company="KingR">
+// <copyright file="RangeDecoder.cs" company="KingR">
 // Copyright (c) KingR. All rights reserved.
 // </copyright>
 // -----------------------------------------------------------------------
@@ -9,7 +9,7 @@ namespace System.IO.Compression.RangeCoder;
 /// <summary>
 /// The range decoder.
 /// </summary>
-internal class Decoder
+internal class RangeDecoder
 {
     /// <summary>
     /// The top value.

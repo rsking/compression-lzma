@@ -45,6 +45,18 @@ internal class OutWindow
         this.ReleaseStream();
         this.stream = stream;
         this.expandable = IsExandable(this.stream);
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Major Code Smell", "S3011:Reflection should not be used to increase accessibility of classes, methods, or fields", Justification = "Checked")]
+        static bool IsExandable(Stream stream)
+        {
+            if (stream is MemoryStream memoryStream)
+            {
+                var field = memoryStream.GetType().GetField("_expandable", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                return field?.GetValue(memoryStream) is not bool b || b;
+            }
+
+            return true;
+        }
     }
 
     /// <summary>
@@ -154,16 +166,5 @@ internal class OutWindow
         }
 
         return this.buffer[currentPosition];
-    }
-
-    private static bool IsExandable(Stream stream)
-    {
-        if (stream is MemoryStream memoryStream)
-        {
-            var field = memoryStream.GetType().GetField("_expandable", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-            return field?.GetValue(memoryStream) is bool b && b;
-        }
-
-        return true;
     }
 }

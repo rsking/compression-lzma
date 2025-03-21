@@ -52,7 +52,7 @@ internal struct BitEncoder
     /// </summary>
     /// <param name="encoder">The encoder.</param>
     /// <param name="symbol">The symbol.</param>
-    public void Encode(Encoder encoder, uint symbol)
+    public void Encode(RangeEncoder encoder, uint symbol)
     {
         var newBound = (encoder.Range >> NumBitModelTotalBits) * this.probability;
         if (symbol is 0)
@@ -67,7 +67,7 @@ internal struct BitEncoder
             this.probability -= this.probability >> NumMoveBits;
         }
 
-        if (encoder.Range < Encoder.TopValue)
+        if (encoder.Range < RangeEncoder.TopValue)
         {
             encoder.Range <<= 8;
             encoder.ShiftLow();

@@ -23,7 +23,7 @@ internal readonly struct BitTreeDecoder(int numBitLevels)
     /// <param name="rangeDecoder">The range decoder.</param>
     /// <param name="numBitLevels">The number of bit levels.</param>
     /// <returns>The decoded value.</returns>
-    public static uint ReverseDecode(BitDecoder[] models, uint startIndex, Decoder rangeDecoder, int numBitLevels)
+    public static uint ReverseDecode(BitDecoder[] models, uint startIndex, RangeDecoder rangeDecoder, int numBitLevels)
     {
         var m = 1U;
         var symbol = 0U;
@@ -54,7 +54,7 @@ internal readonly struct BitTreeDecoder(int numBitLevels)
     /// </summary>
     /// <param name="rangeDecoder">The range decoder.</param>
     /// <returns>The decoded value.</returns>
-    public uint Decode(Decoder rangeDecoder)
+    public uint Decode(RangeDecoder rangeDecoder)
     {
         var m = 1U;
         for (var bitIndex = this.numBitLevels; bitIndex > 0; bitIndex--)
@@ -70,7 +70,7 @@ internal readonly struct BitTreeDecoder(int numBitLevels)
     /// </summary>
     /// <param name="rangeDecoder">The range decoder.</param>
     /// <returns>The decoded value.</returns>
-    public uint ReverseDecode(Decoder rangeDecoder)
+    public uint ReverseDecode(RangeDecoder rangeDecoder)
     {
         var m = 1U;
         var symbol = 0U;

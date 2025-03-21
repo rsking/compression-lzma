@@ -14,7 +14,7 @@ using static System.IO.Compression.Constants;
 public class LzmaDecoder
 {
     private readonly LZ.OutWindow outWindow = new();
-    private readonly RangeCoder.Decoder rangeDecoder = new();
+    private readonly RangeCoder.RangeDecoder rangeDecoder = new();
 
     private readonly RangeCoder.BitDecoder[] matchDecoders = new RangeCoder.BitDecoder[NumStates << NumPosStatesBitsMax];
     private readonly RangeCoder.BitDecoder[] repDecoders = new RangeCoder.BitDecoder[NumStates];
@@ -33,8 +33,8 @@ public class LzmaDecoder
 
     private readonly RangeCoder.BitTreeDecoder posAlignDecoder = new(NumAlignBits);
 
-    private State state = new();
-    private ulong bytesRead = 0UL;
+    private State state;
+    private ulong bytesRead;
 
     private uint dictionarySize;
     private uint dictionarySizeCheck;
@@ -160,7 +160,7 @@ public class LzmaDecoder
         this.SetInputStream(input);
         this.SetOutputStream(output);
 
-        var currentState = new State();
+        State currentState = default;
         var nowPos64 = 0UL;
         this.Decode(ref currentState, ref nowPos64, this.firstRead, (ulong)outputSize);
 
@@ -373,7 +373,7 @@ public class LzmaDecoder
             this.highCoder.Init();
         }
 
-        public uint Decode(RangeCoder.Decoder rangeDecoder, uint posState)
+        public uint Decode(RangeCoder.RangeDecoder rangeDecoder, uint posState)
         {
             if (this.firstChoice.Decode(rangeDecoder) is 0U)
             {
@@ -436,11 +436,11 @@ public class LzmaDecoder
             }
         }
 
-        public byte DecodeNormal(RangeCoder.Decoder rangeDecoder, uint pos, byte prevByte) => this.coders is not null
+        public byte DecodeNormal(RangeCoder.RangeDecoder rangeDecoder, uint pos, byte prevByte) => this.coders is not null
             ? this.coders[this.GetState(pos, prevByte)].DecodeNormal(rangeDecoder)
             : throw new InvalidOperationException();
 
-        public byte DecodeWithMatchByte(RangeCoder.Decoder rangeDecoder, uint pos, byte prevByte, byte matchByte) => this.coders is not null
+        public byte DecodeWithMatchByte(RangeCoder.RangeDecoder rangeDecoder, uint pos, byte prevByte, byte matchByte) => this.coders is not null
             ? this.coders[this.GetState(pos, prevByte)].DecodeWithMatchByte(rangeDecoder, matchByte)
             : throw new InvalidOperationException();
 
@@ -460,7 +460,7 @@ public class LzmaDecoder
                 }
             }
 
-            public byte DecodeNormal(RangeCoder.Decoder rangeDecoder)
+            public byte DecodeNormal(RangeCoder.RangeDecoder rangeDecoder)
             {
                 var symbol = 1U;
                 do
@@ -472,7 +472,7 @@ public class LzmaDecoder
                 return (byte)symbol;
             }
 
-            public byte DecodeWithMatchByte(RangeCoder.Decoder rangeDecoder, byte matchByte)
+            public byte DecodeWithMatchByte(RangeCoder.RangeDecoder rangeDecoder, byte matchByte)
             {
                 var symbol = 1U;
                 do
