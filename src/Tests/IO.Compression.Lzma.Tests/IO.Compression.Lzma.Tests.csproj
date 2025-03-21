@@ -11,7 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="..\lorem-ipsum.*" Link="%(FileName)%(Extension)" />
+    <EmbeddedResource Include="..\*.lzma" Link="%(FileName)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <_TxtEmbeddedResource Include="..\*.txt" Link="%(FileName)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup>
@@ -32,5 +36,61 @@
   <ItemGroup>
     <ProjectReference Include="..\..\IO.Compression.Lzma\IO.Compression.Lzma.csproj" />
   </ItemGroup>
+
+  <UsingTask TaskName="ChangeLineEndings" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Files ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <DestinationFolder ParameterType="Microsoft.Build.Framework.ITaskItem" Required="true" />
+      <Result ParameterType="Microsoft.Build.Framework.ITaskItem[]" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.IO.Compression" />
+      <Code Type="Fragment" Language="cs">
+        <![CDATA[
+if (Files.Length > 0)
+{
+    Result = new TaskItem[Files.Length];
+    for (var i = 0; i < Files.Length; i++)
+    {
+        var item = Files[i];
+        var link = item.GetMetadata("Link");
+        var sourceItemSpec = item.ItemSpec;
+
+        var destinationItemSpec = Path.Combine(DestinationFolder.ItemSpec, Path.GetFileName(item.ItemSpec));
+
+        if (!File.Exists(destinationItemSpec))
+        {
+            File.WriteAllText(destinationItemSpec, File.ReadAllText(sourceItemSpec).Replace("\r\n", "\n"));
+        }
+
+        var destinationItem = new TaskItem(destinationItemSpec);
+        if (link != null)
+        {
+            destinationItem.SetMetadata("Link", link);
+        }
+
+        Result[i] = destinationItem;
+    }
+}
+]]>
+      </Code>
+    </Task>
+  </UsingTask>
+
+
+
+  <Target Name="_UpdateEmbeddedResources"
+          BeforeTargets="AssignTargetPaths">
+
+    <ChangeLineEndings Files="@(_TxtEmbeddedResource)" DestinationFolder="$(IntermediateOutputPath)">
+      <Output ItemName="TxtEmbeddedResource" TaskParameter="Result" />
+    </ChangeLineEndings>
+
+    <ItemGroup>
+      <EmbeddedResource Include="@(TxtEmbeddedResource)" />
+    </ItemGroup>
+
+  </Target>
 
 </Project>
