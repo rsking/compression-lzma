@@ -195,24 +195,26 @@ public sealed class LzmaStream : Stream
 #endif
 
     /// <inheritdoc/>
-    public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken) => Task.Run(
-        () =>
+    public override Task CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
+    {
+        if (this.bytesLeft is 0)
         {
-            if (this.encoder is not null)
+            return Task.CompletedTask;
+        }
+
+        if (this.decoder is null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        return Task.Run(
+            () =>
             {
-                this.encoder.WriteCoderProperties(destination);
-
-                var fileSize = this.stream.Length;
-
-                for (var i = 0; i < 8; i++)
-                {
-                    destination.WriteByte((byte)(fileSize >> (8 * i)));
-                }
-
-                this.encoder.Compress(this.stream, destination);
-            }
-        },
-        cancellationToken);
+                this.decoder.Decompress(destination, this.bytesLeft);
+                this.bytesLeft = 0;
+            },
+            cancellationToken);
+    }
 
     /// <inheritdoc/>
     public override void Close()

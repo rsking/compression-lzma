@@ -5,6 +5,9 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IO.Compression.Lzma", "IO.Compression.Lzma\IO.Compression.Lzma.csproj", "{AA632210-4012-49D3-904F-BADA89B59AE6}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{33007D5E-2946-4DB1-B21B-A4143926583D}"
+	ProjectSection(SolutionItems) = preProject
+		Tests\coverage.runsettings = Tests\coverage.runsettings
+	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IO.Compression.Lzma.Tests", "Tests\IO.Compression.Lzma.Tests\IO.Compression.Lzma.Tests.csproj", "{A14747DB-7ACD-4105-875B-4ECB9AEDBF8E}"
 EndProject

@@ -49,6 +49,28 @@ public class LzmaStreamTests
         }
 
         [Fact]
+        public async Task WithBufferSizeAsync()
+        {
+            using var output = new MemoryStream();
+            using (var input = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.txt"))
+            {
+                Assert.NotNull(input);
+#if NETCOREAPP3_0_OR_GREATER
+                await
+#endif
+                using var lzmaStream = new LzmaStream(output, System.IO.Compression.CompressionMode.Compress, leaveOpen: true);
+                lzmaStream.SetLength(input.Length);
+                await input.CopyToAsync(lzmaStream, (int)input.Length);
+            }
+
+            output.Position = 0;
+
+            // compare the streams
+            using var lzma = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.lzma");
+            CompareStreams(output, lzma);
+        }
+
+        [Fact]
         public void WithoutBufferSize()
         {
             using var output = new MemoryStream();
@@ -58,6 +80,28 @@ public class LzmaStreamTests
                 using var lzmaStream = new LzmaStream(output, System.IO.Compression.CompressionMode.Compress, leaveOpen: true);
                 lzmaStream.SetLength(input.Length);
                 input.CopyTo(lzmaStream);
+            }
+
+            output.Position = 0;
+
+            // compare the streams
+            using var lzma = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.lzma");
+            CompareStreams(output, lzma);
+        }
+
+        [Fact]
+        public async Task WithoutBufferSizeAsync()
+        {
+            using var output = new MemoryStream();
+            using (var input = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.txt"))
+            {
+                Assert.NotNull(input);
+#if NETCOREAPP3_0_OR_GREATER
+                await
+#endif
+                using var lzmaStream = new LzmaStream(output, System.IO.Compression.CompressionMode.Compress, leaveOpen: true);
+                lzmaStream.SetLength(input.Length);
+                await input.CopyToAsync(lzmaStream);
             }
 
             output.Position = 0;
@@ -84,6 +128,22 @@ public class LzmaStreamTests
         }
 
         [Fact]
+        public async Task WithBufferSizeAsync()
+        {
+            using var outStream = new MemoryStream();
+            using var inStream = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.lzma");
+            Assert.NotNull(inStream);
+#if NETCOREAPP3_0_OR_GREATER
+            await
+#endif
+            using var lzmaStream = new LzmaStream(inStream, System.IO.Compression.CompressionMode.Decompress);
+            await lzmaStream.CopyToAsync(outStream, 1024);
+            outStream.Position = 0;
+            using var txt = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.txt");
+            CompareStreams(outStream, txt);
+        }
+
+        [Fact]
         public void WithoutBufferSize()
         {
             using var outStream = new MemoryStream();
@@ -91,6 +151,22 @@ public class LzmaStreamTests
             Assert.NotNull(inStream);
             using var lzmaStream = new LzmaStream(inStream, System.IO.Compression.CompressionMode.Decompress);
             lzmaStream.CopyTo(outStream);
+            outStream.Position = 0;
+            using var txt = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.txt");
+            CompareStreams(outStream, txt);
+        }
+
+        [Fact]
+        public async Task WithoutBufferSizeAsync()
+        {
+            using var outStream = new MemoryStream();
+            using var inStream = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.lzma");
+            Assert.NotNull(inStream);
+#if NETCOREAPP3_0_OR_GREATER
+            await
+#endif
+            using var lzmaStream = new LzmaStream(inStream, System.IO.Compression.CompressionMode.Decompress);
+            await lzmaStream.CopyToAsync(outStream);
             outStream.Position = 0;
             using var txt = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.txt");
             CompareStreams(outStream, txt);
