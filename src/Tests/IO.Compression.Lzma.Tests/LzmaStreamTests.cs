@@ -77,7 +77,7 @@ public class LzmaStreamTests
             using var inStream = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.lzma");
             Assert.NotNull(inStream);
             using var lzmaStream = new LzmaStream(inStream, System.IO.Compression.CompressionMode.Decompress);
-            lzmaStream.CopyTo(outStream, short.MaxValue);
+            lzmaStream.CopyTo(outStream, 1024);
             outStream.Position = 0;
             using var txt = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.txt");
             CompareStreams(outStream, txt);

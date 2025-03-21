@@ -17,9 +17,9 @@ public sealed class LzmaStream : Stream
 
     private readonly LzmaDecoder? decoder;
 
-    private readonly long outputSize;
-
     private readonly bool leaveOpen;
+
+    private long bytesLeft;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LzmaStream"/> class by using the specified stream and compression mode, and optionally leaves the stream open.
@@ -48,7 +48,7 @@ public sealed class LzmaStream : Stream
             _ = this.stream.Read(properties, 0, properties.Length);
             this.decoder = new(properties);
 
-            this.outputSize = 0L;
+            var outputSize = 0L;
             for (var i = 0; i < 8; i++)
             {
                 var v = stream.ReadByte();
@@ -57,8 +57,11 @@ public sealed class LzmaStream : Stream
                     throw new InvalidOperationException("Can't Read 1");
                 }
 
-                this.outputSize |= ((long)(byte)v) << (8 * i);
+                outputSize |= ((long)(byte)v) << (8 * i);
             }
+
+            this.decoder.SetInputStream(stream);
+            this.bytesLeft = outputSize;
         }
         else
         {
@@ -148,11 +151,13 @@ public sealed class LzmaStream : Stream
             throw new InvalidOperationException();
         }
 
-        if (this.stream.Position < this.stream.Length && count > this.outputSize)
+        if (this.bytesLeft > 0)
         {
+            var bytesToRead = Math.Min(this.bytesLeft, count);
             using var memoryStream = new MemoryStream(buffer, offset, count);
-            this.decoder.Decode(this.stream, memoryStream, this.outputSize);
-            return (int)this.outputSize;
+            this.decoder.Decode(memoryStream, bytesToRead);
+            this.bytesLeft -= Math.Min(memoryStream.Position, count);
+            return (int)bytesToRead;
         }
 
         return 0;
@@ -179,7 +184,7 @@ public sealed class LzmaStream : Stream
             throw new InvalidOperationException();
         }
 
-        this.decoder.Decode(this.stream, destination, this.outputSize);
+        this.decoder.Decode(destination, this.outputSize);
     }
 #endif
 

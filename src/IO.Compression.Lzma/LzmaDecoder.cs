@@ -33,12 +33,15 @@ internal class LzmaDecoder
 
     private readonly RangeCoder.BitTreeDecoder posAlignDecoder = new(NumAlignBits);
 
+    private State state = new();
+    private ulong bytesRead = 0UL;
+
     private uint dictionarySize;
     private uint dictionarySizeCheck;
 
     private uint posStateMask;
 
-    private bool solid;
+    private bool firstRead;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LzmaDecoder"/> class.
@@ -87,7 +90,7 @@ internal class LzmaDecoder
                     this.dictionarySize = dictionarySize;
                     this.dictionarySizeCheck = Math.Max(this.dictionarySize, 1);
                     var blockSize = Math.Max(this.dictionarySizeCheck, 1 << 12);
-                    this.outWindow.Create(blockSize);
+                    this.outWindow.Create((int)blockSize);
                 }
             }
 
@@ -122,6 +125,31 @@ internal class LzmaDecoder
     }
 
     /// <summary>
+    /// Decodes the stream to the output.
+    /// </summary>
+    /// <param name="output">The output stream.</param>
+    /// <param name="outputSize">The output size.</param>
+    public void Decode(Stream output, long outputSize = -1)
+    {
+        this.SetOutputStream(output);
+
+        ulong size;
+        if (outputSize < 0)
+        {
+            size = ulong.MaxValue;
+        }
+        else
+        {
+            size = this.bytesRead + (ulong)outputSize - (ulong)this.outWindow.BytesToWrite;
+        }
+
+        this.Decode(ref this.state, ref this.bytesRead, this.firstRead, size);
+        this.firstRead = false;
+
+        this.outWindow.ReleaseStream();
+    }
+
+    /// <summary>
     /// Decodes the input stream to the output.
     /// </summary>
     /// <param name="input">The input stream.</param>
@@ -129,149 +157,31 @@ internal class LzmaDecoder
     /// <param name="outputSize">The output size.</param>
     public void Decode(Stream input, Stream output, long outputSize = -1)
     {
-        this.Init(input, output);
+        this.SetInputStream(input);
+        this.SetOutputStream(output);
 
-        var state = new State();
-        var rep0 = 0U;
-        var rep1 = 0U;
-        var rep2 = 0U;
-        var rep3 = 0U;
-
+        var currentState = new State();
         var nowPos64 = 0UL;
-        var outSize64 = (ulong)outputSize;
-        if (nowPos64 < outSize64)
-        {
-            if (this.matchDecoders[state.Index << NumPosStatesBitsMax].Decode(this.rangeDecoder) is not 0U)
-            {
-                throw new InvalidDataException();
-            }
+        this.Decode(ref currentState, ref nowPos64, this.firstRead, (ulong)outputSize);
 
-            state.UpdateChar();
-            var b = this.literalDecoder.DecodeNormal(this.rangeDecoder, 0, 0);
-            this.outWindow.PutByte(b);
-            nowPos64++;
-        }
-
-        while (nowPos64 < outSize64)
-        {
-            var posState = (uint)nowPos64 & this.posStateMask;
-            if (this.matchDecoders[(state.Index << NumPosStatesBitsMax) + posState].Decode(this.rangeDecoder) is 0)
-            {
-                var prevByte = this.outWindow.GetByte(0);
-                var b = state.IsCharState()
-                    ? this.literalDecoder.DecodeNormal(this.rangeDecoder, (uint)nowPos64, prevByte)
-                    : this.literalDecoder.DecodeWithMatchByte(this.rangeDecoder, (uint)nowPos64, prevByte, this.outWindow.GetByte(rep0));
-                this.outWindow.PutByte(b);
-                state.UpdateChar();
-                nowPos64++;
-            }
-            else
-            {
-                uint len;
-                if (this.repDecoders[state.Index].Decode(this.rangeDecoder) is 1U)
-                {
-                    if (this.repG0Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
-                    {
-                        if (this.rep0LongDecoders[(state.Index << NumPosStatesBitsMax) + posState].Decode(this.rangeDecoder) is 0U)
-                        {
-                            state.UpdateShortRep();
-                            this.outWindow.PutByte(this.outWindow.GetByte(rep0));
-                            nowPos64++;
-                            continue;
-                        }
-                    }
-                    else
-                    {
-                        uint distance;
-                        if (this.repG1Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
-                        {
-                            distance = rep1;
-                        }
-                        else
-                        {
-                            if (this.repG2Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
-                            {
-                                distance = rep2;
-                            }
-                            else
-                            {
-                                distance = rep3;
-                                rep3 = rep2;
-                            }
-
-                            rep2 = rep1;
-                        }
-
-                        rep1 = rep0;
-                        rep0 = distance;
-                    }
-
-                    len = this.repLenDecoder.Decode(this.rangeDecoder, posState) + MatchMinLen;
-                    state.UpdateRep();
-                }
-                else
-                {
-                    rep3 = rep2;
-                    rep2 = rep1;
-                    rep1 = rep0;
-                    len = MatchMinLen + this.lenDecoder.Decode(this.rangeDecoder, posState);
-                    state.UpdateMatch();
-                    var posSlot = this.posSlotDecoder[GetLenToPosState(len)].Decode(this.rangeDecoder);
-                    if (posSlot >= StartPosModelIndex)
-                    {
-                        var numDirectBits = (int)((posSlot >> 1) - 1);
-                        rep0 = (2 | (posSlot & 1)) << numDirectBits;
-                        if (posSlot < EndPosModelIndex)
-                        {
-                            rep0 += RangeCoder.BitTreeDecoder.ReverseDecode(this.posDecoders, rep0 - posSlot - 1, this.rangeDecoder, numDirectBits);
-                        }
-                        else
-                        {
-                            rep0 += this.rangeDecoder.DecodeDirectBits(numDirectBits - NumAlignBits) << NumAlignBits;
-                            rep0 += this.posAlignDecoder.ReverseDecode(this.rangeDecoder);
-                        }
-                    }
-                    else
-                    {
-                        rep0 = posSlot;
-                    }
-                }
-
-                if (rep0 >= this.outWindow.TrainSize + nowPos64 || rep0 >= this.dictionarySizeCheck)
-                {
-                    if (rep0 is uint.MaxValue)
-                    {
-                        break;
-                    }
-
-                    throw new InvalidDataException();
-                }
-
-                this.outWindow.CopyBlock(rep0, len);
-                nowPos64 += len;
-            }
-        }
-
-        this.outWindow.Flush();
         this.outWindow.ReleaseStream();
         this.rangeDecoder.ReleaseStream();
     }
 
     /// <summary>
-    /// Trains this instance with the stream.
+    /// Sets the input stream.
     /// </summary>
     /// <param name="stream">The stream.</param>
-    /// <returns><see langword="true"/> if the training was successful; otherwise <see langword="false"/>.</returns>
-    public bool Train(Stream stream)
+    public void SetInputStream(Stream? stream)
     {
-        this.solid = true;
-        return this.outWindow.Train(stream);
-    }
+        this.rangeDecoder.ReleaseStream();
+        if (stream is null)
+        {
+            return;
+        }
 
-    private void Init(Stream inStream, Stream outStream)
-    {
-        this.rangeDecoder.Init(inStream);
-        this.outWindow.Init(outStream, this.solid);
+        this.rangeDecoder.Init(stream);
+        this.firstRead = true;
 
         for (var i = 0U; i < NumStates; i++)
         {
@@ -302,6 +212,132 @@ internal class LzmaDecoder
         this.lenDecoder.Init();
         this.repLenDecoder.Init();
         this.posAlignDecoder.Init();
+    }
+
+    /// <summary>
+    /// Sets the output stream.
+    /// </summary>
+    /// <param name="stream">The stream.</param>
+    public void SetOutputStream(Stream stream) => this.outWindow.Init(stream);
+
+    private void Decode(ref State state, ref ulong nowPos64, bool firstRead, ulong outSize64)
+    {
+        var rep0 = 0U;
+        var rep1 = 0U;
+        var rep2 = 0U;
+        var rep3 = 0U;
+
+        if (firstRead)
+        {
+            if (this.matchDecoders[state.Index << NumPosStatesBitsMax].Decode(this.rangeDecoder) is not 0U)
+            {
+                throw new InvalidDataException();
+            }
+
+            state.UpdateChar();
+            var b = this.literalDecoder.DecodeNormal(this.rangeDecoder, 0, 0);
+            this.outWindow.PutByte(b);
+            nowPos64++;
+        }
+
+        while (nowPos64 < outSize64)
+        {
+            var posState = (uint)nowPos64 & this.posStateMask;
+            if (this.matchDecoders[(state.Index << NumPosStatesBitsMax) + posState].Decode(this.rangeDecoder) is 0)
+            {
+                var prevByte = this.outWindow.GetByte(0);
+                var b = state.IsCharState()
+                    ? this.literalDecoder.DecodeNormal(this.rangeDecoder, (uint)nowPos64, prevByte)
+                    : this.literalDecoder.DecodeWithMatchByte(this.rangeDecoder, (uint)nowPos64, prevByte, this.outWindow.GetByte(rep0));
+                this.outWindow.PutByte(b);
+                state.UpdateChar();
+                nowPos64++;
+                continue;
+            }
+
+            uint len;
+            if (this.repDecoders[state.Index].Decode(this.rangeDecoder) is 1U)
+            {
+                if (this.repG0Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
+                {
+                    if (this.rep0LongDecoders[(state.Index << NumPosStatesBitsMax) + posState].Decode(this.rangeDecoder) is 0U)
+                    {
+                        state.UpdateShortRep();
+                        this.outWindow.PutByte(this.outWindow.GetByte(rep0));
+                        nowPos64++;
+                        continue;
+                    }
+                }
+                else
+                {
+                    uint distance;
+                    if (this.repG1Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
+                    {
+                        distance = rep1;
+                    }
+                    else
+                    {
+                        if (this.repG2Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
+                        {
+                            distance = rep2;
+                        }
+                        else
+                        {
+                            distance = rep3;
+                            rep3 = rep2;
+                        }
+
+                        rep2 = rep1;
+                    }
+
+                    rep1 = rep0;
+                    rep0 = distance;
+                }
+
+                len = this.repLenDecoder.Decode(this.rangeDecoder, posState) + MatchMinLen;
+                state.UpdateRep();
+            }
+            else
+            {
+                rep3 = rep2;
+                rep2 = rep1;
+                rep1 = rep0;
+                len = MatchMinLen + this.lenDecoder.Decode(this.rangeDecoder, posState);
+                state.UpdateMatch();
+                var posSlot = this.posSlotDecoder[GetLenToPosState(len)].Decode(this.rangeDecoder);
+                if (posSlot >= StartPosModelIndex)
+                {
+                    var numDirectBits = (int)((posSlot >> 1) - 1);
+                    rep0 = (2 | (posSlot & 1)) << numDirectBits;
+                    if (posSlot < EndPosModelIndex)
+                    {
+                        rep0 += RangeCoder.BitTreeDecoder.ReverseDecode(this.posDecoders, rep0 - posSlot - 1, this.rangeDecoder, numDirectBits);
+                    }
+                    else
+                    {
+                        rep0 += this.rangeDecoder.DecodeDirectBits(numDirectBits - NumAlignBits) << NumAlignBits;
+                        rep0 += this.posAlignDecoder.ReverseDecode(this.rangeDecoder);
+                    }
+                }
+                else
+                {
+                    rep0 = posSlot;
+                }
+            }
+
+            if (rep0 >= nowPos64 || rep0 >= this.dictionarySizeCheck)
+            {
+                if (rep0 is uint.MaxValue)
+                {
+                    break;
+                }
+
+                throw new InvalidDataException();
+            }
+
+            this.outWindow.CopyBlock(rep0, len);
+            nowPos64 += len;
+        }
     }
 
     private sealed class LenDecoder

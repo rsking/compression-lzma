@@ -98,8 +98,6 @@ public class LzmaEncoder
 
     private bool needReleaseMFStream;
 
-    private uint trainSize;
-
     /// <summary>
     /// Initializes a new instance of the <see cref="LzmaEncoder"/> class.
     /// </summary>
@@ -340,10 +338,6 @@ public class LzmaEncoder
             this.matchFinder.Init();
             this.needReleaseMFStream = true;
             this.inputStream = null;
-            if (this.trainSize > 0)
-            {
-                this.matchFinder.Skip(this.trainSize);
-            }
         }
 
         if (this.finished)
@@ -552,12 +546,6 @@ public class LzmaEncoder
 
         output.Write(properties, 0, properties.Length);
     }
-
-    /// <summary>
-    /// Sets the traing size.
-    /// </summary>
-    /// <param name="trainSize">The train size to set.</param>
-    public void SetTrainSize(uint trainSize) => this.trainSize = trainSize;
 
     private static byte[] CreatePosSlots()
     {

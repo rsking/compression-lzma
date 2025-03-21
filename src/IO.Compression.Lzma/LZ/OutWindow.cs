@@ -12,81 +12,39 @@ namespace System.IO.Compression.LZ;
 internal class OutWindow
 {
     private byte[] buffer = [];
-    private uint pos;
-    private uint streamPos;
+    private int pos;
+    private int startPos;
     private Stream? stream;
+    private bool expandable;
 
     /// <summary>
-    /// Gets or sets the train size.
+    /// Gets the number of bytes to flush.
     /// </summary>
-    public uint TrainSize { get; set; }
+    public int BytesToWrite => this.pos - this.startPos;
 
     /// <summary>
     /// Creates the out window.
     /// </summary>
     /// <param name="windowSize">The window size.</param>
-    public void Create(uint windowSize)
+    public void Create(int windowSize)
     {
         if (this.buffer.Length != windowSize)
         {
             this.buffer = new byte[windowSize];
         }
 
-        this.pos = 0;
-        this.streamPos = 0;
+        this.startPos = this.pos = 0;
     }
 
     /// <summary>
     /// Initializes the out window with the stream.
     /// </summary>
     /// <param name="stream">The stream.</param>
-    /// <param name="solid">Set to <see langword="true"/> to make this solid.</param>
-    public void Init(Stream stream, bool solid)
+    public void Init(Stream stream)
     {
         this.ReleaseStream();
         this.stream = stream;
-        if (!solid)
-        {
-            this.streamPos = this.pos = this.TrainSize = 0U;
-        }
-    }
-
-    /// <summary>
-    /// Trains this instance with the stream.
-    /// </summary>
-    /// <param name="stream">The stream.</param>
-    /// <returns><see langword="true"/> if the training was successful; otherwise <see langword="false"/>.</returns>
-    public bool Train(Stream stream)
-    {
-        var len = stream.Length;
-        var size = (uint)Math.Min(len, this.buffer.Length);
-        this.TrainSize = size;
-        stream.Position = len - size;
-        this.streamPos = this.pos = 0U;
-        while (size > 0U)
-        {
-            var curSize = (uint)this.buffer.Length - this.pos;
-            if (size < curSize)
-            {
-                curSize = size;
-            }
-
-            var numReadBytes = (uint)stream.Read(this.buffer, (int)this.pos, (int)curSize);
-            if (numReadBytes is 0U)
-            {
-                return false;
-            }
-
-            size -= numReadBytes;
-            this.pos += numReadBytes;
-            this.streamPos += numReadBytes;
-            if (this.pos == this.buffer.Length)
-            {
-                this.streamPos = this.pos = 0U;
-            }
-        }
-
-        return true;
+        this.expandable = IsExandable(this.stream);
     }
 
     /// <summary>
@@ -103,24 +61,29 @@ internal class OutWindow
     /// </summary>
     public void Flush()
     {
-        var size = this.pos - this.streamPos;
-        if (size is 0U)
+        if (this.stream is null)
         {
             return;
         }
 
-        if (this.stream is null)
+        var size = this.expandable
+            ? this.pos - this.startPos
+            : Math.Min(this.pos - this.startPos, (int)(this.stream.Length - this.stream.Position));
+
+        if (size is 0)
         {
-            throw new InvalidOperationException();
+            return;
         }
 
-        this.stream.Write(this.buffer, (int)this.streamPos, (int)size);
+        this.stream.Write(this.buffer, this.startPos, size);
         if (this.pos >= this.buffer.Length)
         {
-            this.pos = 0;
+            this.startPos = this.pos = 0;
         }
-
-        this.streamPos = this.pos;
+        else
+        {
+            this.startPos += size;
+        }
     }
 
     /// <summary>
@@ -128,15 +91,16 @@ internal class OutWindow
     /// </summary>
     /// <param name="distance">The distance.</param>
     /// <param name="length">The length.</param>
-    public void CopyBlock(uint distance, uint length)
+    /// <returns>The number of bytes copied.</returns>
+    public uint CopyBlock(uint distance, uint length)
     {
         var currentPosition = this.pos - distance - 1;
         if (currentPosition >= this.buffer.Length)
         {
-            currentPosition += (uint)this.buffer.Length;
+            currentPosition -= (uint)this.buffer.Length;
         }
 
-        for (; length > 0; length--)
+        for (var i = length; i > 0; i--)
         {
             if (currentPosition >= this.buffer.Length)
             {
@@ -149,6 +113,8 @@ internal class OutWindow
                 this.Flush();
             }
         }
+
+        return length;
     }
 
     /// <summary>
@@ -188,5 +154,16 @@ internal class OutWindow
         }
 
         return this.buffer[currentPosition];
+    }
+
+    private static bool IsExandable(Stream stream)
+    {
+        if (stream is MemoryStream memoryStream)
+        {
+            var field = memoryStream.GetType().GetField("_expandable", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            return field?.GetValue(memoryStream) is bool b && b;
+        }
+
+        return true;
     }
 }
