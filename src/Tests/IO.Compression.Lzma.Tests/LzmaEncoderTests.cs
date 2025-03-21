@@ -51,7 +51,7 @@ public class LzmaEncoderTests
                 output.WriteByte((byte)(fileSize >> (8 * i)));
             }
 
-            encoder.Encode(input, output);
+            encoder.Compress(input, output);
         }
 
         output.Position = 0;

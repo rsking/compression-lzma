@@ -127,7 +127,7 @@ encodeCommand.SetAction(parseResult =>
             outStream.WriteByte((byte)(fileSize >> (8 * i)));
         }
 
-        encoder.Encode(inStream, outStream, progress: null);
+        encoder.Compress(inStream, outStream, progress: null);
     }
 });
 

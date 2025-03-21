@@ -267,12 +267,12 @@ public class LzmaEncoder
     }
 
     /// <summary>
-    /// Encodes the input stream to the output.
+    /// Compresses the input stream to the output.
     /// </summary>
     /// <param name="input">The input stream.</param>
     /// <param name="output">The output stream.</param>
     /// <param name="progress">The progress.</param>
-    public void Encode(Stream input, Stream output, Action<long, long>? progress = null)
+    public void Compress(Stream input, Stream output, Action<long, long>? progress = null)
     {
         this.needReleaseMFStream = false;
         try

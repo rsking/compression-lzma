@@ -122,7 +122,7 @@ public sealed class LzmaStream : Stream
         }
 
         this.SetLength(stream.Length);
-        this.encoder.Encode(stream, this.stream);
+        this.encoder.Compress(stream, this.stream);
     }
 
     /// <inheritdoc/>
@@ -155,7 +155,7 @@ public sealed class LzmaStream : Stream
         {
             var bytesToRead = Math.Min(this.bytesLeft, count);
             using var memoryStream = new MemoryStream(buffer, offset, count);
-            this.decoder.Decode(memoryStream, bytesToRead);
+            this.decoder.Decompress(memoryStream, bytesToRead);
             this.bytesLeft -= Math.Min(memoryStream.Position, count);
             return (int)bytesToRead;
         }
@@ -172,19 +172,25 @@ public sealed class LzmaStream : Stream
         }
 
         using var memoryStream = new MemoryStream(buffer, offset, count);
-        this.encoder.Encode(memoryStream, this.stream);
+        this.encoder.Compress(memoryStream, this.stream);
     }
 
 #if NETSTANDARD2_1_OR_GREATER
     /// <inheritdoc/>
     public override void CopyTo(Stream destination, int bufferSize)
     {
+        if (this.bytesLeft is 0)
+        {
+            return;
+        }
+
         if (this.decoder is null)
         {
             throw new InvalidOperationException();
         }
 
-        this.decoder.Decode(destination, this.outputSize);
+        this.decoder.Decompress(destination, this.bytesLeft);
+        this.bytesLeft = 0;
     }
 #endif
 
@@ -203,7 +209,7 @@ public sealed class LzmaStream : Stream
                     destination.WriteByte((byte)(fileSize >> (8 * i)));
                 }
 
-                this.encoder.Encode(this.stream, destination);
+                this.encoder.Compress(this.stream, destination);
             }
         },
         cancellationToken);

@@ -11,7 +11,7 @@ using static System.IO.Compression.Constants;
 /// <summary>
 /// The LZMA decoder.
 /// </summary>
-internal class LzmaDecoder
+public class LzmaDecoder
 {
     private readonly LZ.OutWindow outWindow = new();
     private readonly RangeCoder.Decoder rangeDecoder = new();
@@ -125,11 +125,11 @@ internal class LzmaDecoder
     }
 
     /// <summary>
-    /// Decodes the stream to the output.
+    /// Decompresses the stream to the output.
     /// </summary>
     /// <param name="output">The output stream.</param>
     /// <param name="outputSize">The output size.</param>
-    public void Decode(Stream output, long outputSize = -1)
+    public void Decompress(Stream output, long outputSize = -1)
     {
         this.SetOutputStream(output);
 

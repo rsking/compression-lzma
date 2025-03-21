@@ -74,7 +74,7 @@ internal static class Benchmark
             progressInfo.Init();
             _ = inStream.Seek(0, SeekOrigin.Begin);
             _ = compressedStream.Seek(0, SeekOrigin.Begin);
-            encoder.Encode(inStream, compressedStream, (inSize, _) => progressInfo.SetProgress(inSize));
+            encoder.Compress(inStream, compressedStream, (inSize, _) => progressInfo.SetProgress(inSize));
             var sp2 = DateTime.UtcNow - progressInfo.Time;
             var encodeTime = (ulong)sp2.Ticks;
 
