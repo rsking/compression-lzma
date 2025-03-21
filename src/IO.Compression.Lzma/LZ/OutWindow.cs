@@ -11,16 +11,16 @@ namespace System.IO.Compression.LZ;
 /// </summary>
 internal class OutWindow
 {
-    private byte[]? buffer = null;
+    private byte[]? buffer;
     private uint pos;
-    private uint windowSize = 0;
+    private uint windowSize;
     private uint streamPos;
     private Stream? stream;
 
     /// <summary>
     /// Gets or sets the train size.
     /// </summary>
-    public uint TrainSize { get; set; } = 0;
+    public uint TrainSize { get; set; }
 
     /// <summary>
     /// Creates the out window.

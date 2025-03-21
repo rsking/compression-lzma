@@ -5,7 +5,6 @@ public class LzmaDecoderTests
     [Fact]
     public void Test1()
     {
-        var names = typeof(LzmaDecoderTests).Assembly.GetManifestResourceNames();
         using var lzma = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.lzma");
 
         Assert.NotNull(lzma);

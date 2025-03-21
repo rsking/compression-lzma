@@ -19,5 +19,5 @@ internal interface ICoder
     /// <param name="inSize">input Size. -1 if unknown.</param>
     /// <param name="outSize">output Size. -1 if unknown.</param>
     /// <param name="progress">callback progress reference.</param>
-    void Code(Stream inStream, Stream outStream, long inSize, long outSize, Action<long, long> progress);
+    void Code(Stream inStream, Stream outStream, long inSize = -1, long outSize = -1, Action<long, long>? progress = null);
 }

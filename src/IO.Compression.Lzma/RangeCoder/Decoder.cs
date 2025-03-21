@@ -14,7 +14,7 @@ internal class Decoder
     /// <summary>
     /// The top value.
     /// </summary>
-    public const uint TopValue = 1 << 24;
+    public const uint TopValue = 1U << 24;
 
     /// <summary>
     /// Gets or sets the range.

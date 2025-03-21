@@ -14,17 +14,22 @@ internal abstract class LzmaBase
     /// <summary>
     /// The number of registered distances.
     /// </summary>
-    public const uint NumRepDistances = 4;
+    public const uint NumRepDistances = 4U;
 
     /// <summary>
     /// The number of states.
     /// </summary>
-    public const uint NumStates = 12;
+    public const uint NumStates = 12U;
 
     /// <summary>
     /// The number of position slot bits.
     /// </summary>
     public const int NumPosSlotBits = 6;
+
+    /// <summary>
+    /// The dictionary size minimum.
+    /// </summary>
+    public const int DicLogSizeMin = 0;
 
     /// <summary>
     /// The number length to position state bits.
@@ -34,12 +39,12 @@ internal abstract class LzmaBase
     /// <summary>
     /// The number length to position states.
     /// </summary>
-    public const uint NumLenToPosStates = 1 << NumLenToPosStatesBits;
+    public const uint NumLenToPosStates = 1U << NumLenToPosStatesBits;
 
     /// <summary>
     /// The match minimum length.
     /// </summary>
-    public const uint MatchMinLen = 2;
+    public const uint MatchMinLen = 2U;
 
     /// <summary>
     /// The number of align bits.
@@ -47,19 +52,39 @@ internal abstract class LzmaBase
     public const int NumAlignBits = 4;
 
     /// <summary>
+    /// The align table size.
+    /// </summary>
+    public const uint AlignTableSize = 1U << NumAlignBits;
+
+    /// <summary>
+    /// The align mask.
+    /// </summary>
+    public const uint AlignMask = AlignTableSize - 1;
+
+    /// <summary>
     /// The start position model index.
     /// </summary>
-    public const uint StartPosModelIndex = 4;
+    public const uint StartPosModelIndex = 4U;
 
     /// <summary>
     /// The end position model index.
     /// </summary>
-    public const uint EndPosModelIndex = 14;
+    public const uint EndPosModelIndex = 14U;
 
     /// <summary>
     /// The number of full distances.
     /// </summary>
-    public const uint NumFullDistances = 1 << ((int)EndPosModelIndex / 2);
+    public const uint NumFullDistances = 1U << ((int)EndPosModelIndex / 2);
+
+    /// <summary>
+    /// The number lit position states bit encoding maximum.
+    /// </summary>
+    public const uint NumLitPosStatesBitsEncodingMax = 4U;
+
+    /// <summary>
+    /// The number lit context bits maximum.
+    /// </summary>
+    public const uint NumLitContextBitsMax = 8U;
 
     /// <summary>
     /// The number of position state bits maximum.
@@ -70,6 +95,16 @@ internal abstract class LzmaBase
     /// The number of position states maximum.
     /// </summary>
     public const uint NumPosStatesMax = 1 << NumPosStatesBitsMax;
+
+    /// <summary>
+    /// The number of position states bits encoding maximum.
+    /// </summary>
+    public const int NumPosStatesBitsEncodingMax = 4;
+
+    /// <summary>
+    /// The number os position states encoding maximum.
+    /// </summary>
+    public const uint NumPosStatesEncodingMax = 1 << NumPosStatesBitsEncodingMax;
 
     /// <summary>
     /// The number of low length bits.
@@ -95,6 +130,16 @@ internal abstract class LzmaBase
     /// The number of mid length symbols.
     /// </summary>
     public const uint NumMidLenSymbols = 1 << NumMidLenBits;
+
+    /// <summary>
+    /// The number of length symbols.
+    /// </summary>
+    public const uint NumLenSymbols = NumLowLenSymbols + NumMidLenSymbols + (1 << NumHighLenBits);
+
+    /// <summary>
+    /// The match maximum length.
+    /// </summary>
+    public const uint MatchMaxLen = MatchMinLen + NumLenSymbols - 1;
 
     /// <summary>
     /// GEts the length to position state.
@@ -149,22 +194,22 @@ internal abstract class LzmaBase
         /// <summary>
         /// Updates the match.
         /// </summary>
-        public void UpdateMatch() => this.Index = (uint)(this.Index < 7 ? 7 : 10);
+        public void UpdateMatch() => this.Index = this.Index < 7 ? 7U : 10U;
 
         /// <summary>
         /// Updates the rep.
         /// </summary>
-        public void UpdateRep() => this.Index = (uint)(this.Index < 7 ? 8 : 11);
+        public void UpdateRep() => this.Index = this.Index < 7 ? 8U : 11U;
 
         /// <summary>
         /// Updates the short rep.
         /// </summary>
-        public void UpdateShortRep() => this.Index = (uint)(this.Index < 7 ? 9 : 11);
+        public void UpdateShortRep() => this.Index = this.Index < 7 ? 9U : 11U;
 
         /// <summary>
         /// Gets a value indicating whether this instace is a char.
         /// </summary>
         /// <returns><see langword="true"/> if this is a char; otherwise <see langword="false"/>.</returns>
-        public readonly bool IsCharState() => this.Index < 7;
+        public readonly bool IsCharState() => this.Index < 7U;
     }
 }
