@@ -18,7 +18,7 @@ public class LzmaEncoder
     private const uint NumFastBytesDefault = 0x20U;
     private const uint NumOpts = 1U << 12;
 
-    private static readonly byte[] FastPos = CreateFastPos();
+    private static readonly byte[] FastPos = CreatePosSlots();
 
     private static readonly string[] MatchFinderIDs =
     [
@@ -99,26 +99,6 @@ public class LzmaEncoder
     private bool needReleaseMFStream;
 
     private uint trainSize;
-
-    private static byte[] CreateFastPos()
-    {
-        const byte Start = 2;
-        const byte FastSlots = 22;
-        var c = 2;
-        var fastPos = new byte[1 << 11];
-        fastPos[0] = 0;
-        fastPos[1] = 1;
-        for (var slotFast = Start; slotFast < FastSlots; slotFast++)
-        {
-            var k = 1U << ((slotFast >> 1) - 1);
-            for (var j = 0U; j < k; j++, c++)
-            {
-                fastPos[c] = slotFast;
-            }
-        }
-
-        return fastPos;
-    }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="LzmaEncoder"/> class.
@@ -302,7 +282,7 @@ public class LzmaEncoder
             SetStreams(input, output);
             while (true)
             {
-                this.CodeOneBlock(out var processedInputSize, out var processedOutputSize, out var isFinished);
+                this.EncodeOneBlock(out var processedInputSize, out var processedOutputSize, out var isFinished);
                 if (isFinished)
                 {
                     return;
@@ -338,12 +318,12 @@ public class LzmaEncoder
     }
 
     /// <summary>
-    /// Codes one block.
+    /// Encodes one block.
     /// </summary>
     /// <param name="inSize">The input size.</param>
     /// <param name="outSize">The output size.</param>
     /// <param name="finished">Whether this is finished.</param>
-    public void CodeOneBlock(out long inSize, out long outSize, out bool finished)
+    public void EncodeOneBlock(out long inSize, out long outSize, out bool finished)
     {
         if (this.matchFinder is null)
         {
@@ -579,10 +559,30 @@ public class LzmaEncoder
     /// <param name="trainSize">The train size to set.</param>
     public void SetTrainSize(uint trainSize) => this.trainSize = trainSize;
 
+    private static byte[] CreatePosSlots()
+    {
+        const byte Start = 2;
+        const byte FastSlots = 22;
+        var c = 2;
+        var fastPos = new byte[1 << 11];
+        fastPos[0] = 0;
+        fastPos[1] = 1;
+        for (var slotFast = Start; slotFast < FastSlots; slotFast++)
+        {
+            var k = 1U << ((slotFast >> 1) - 1);
+            for (var j = 0U; j < k; j++, c++)
+            {
+                fastPos[c] = slotFast;
+            }
+        }
+
+        return fastPos;
+    }
+
     private static uint GetPosSlot(uint pos) => pos switch
     {
-        < 1 << 11 => FastPos[pos],
-        < 1 << 21 => FastPos[pos >> 10] + 20U,
+        < 1U << 11 => FastPos[pos],
+        < 1U << 21 => FastPos[pos >> 10] + 20U,
         _ => FastPos[pos >> 20] + 40U,
     };
 

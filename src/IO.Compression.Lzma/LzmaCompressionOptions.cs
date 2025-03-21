@@ -55,23 +55,27 @@ public sealed class LzmaCompressionOptions
     public bool EndMarker { get; set; } = false;
 
     /// <summary>
+    /// Converts this instance into a dictionary.
+    /// </summary>
+    /// <returns>The dictionary.</returns>
+    public IDictionary<CoderPropId, object> ToDictionary() => new Dictionary<CoderPropId, object>
+    {
+        { CoderPropId.DictionarySize, 1 << this.Dictionary },
+        { CoderPropId.PosStateBits, this.PosBits },
+        { CoderPropId.LitContextBits, this.LiteralContextBits },
+        { CoderPropId.LitPosBits, this.LiteralPosBits },
+        { CoderPropId.Algorithm, DefaultAlgorithm },
+        { CoderPropId.NumFastBytes, this.FastBytes },
+        { CoderPropId.MatchFinder, this.MatchFinder.ToString().ToLowerInvariant() },
+        { CoderPropId.EndMarker, this.EndMarker },
+    };
+
+    /// <summary>
     /// Creates the encoder.
     /// </summary>
     /// <returns>The created encoder.</returns>
     internal LzmaEncoder CreateEncoder()
     {
-        var properties = new Dictionary<CoderPropId, object>
-        {
-            { CoderPropId.DictionarySize, 1 << this.Dictionary },
-            { CoderPropId.PosStateBits, this.PosBits },
-            { CoderPropId.LitContextBits, this.LiteralContextBits },
-            { CoderPropId.LitPosBits, this.LiteralPosBits },
-            { CoderPropId.Algorithm, DefaultAlgorithm },
-            { CoderPropId.NumFastBytes, this.FastBytes },
-            { CoderPropId.MatchFinder, this.MatchFinder.ToString() },
-            { CoderPropId.EndMarker, this.EndMarker },
-        };
-
-        return new LzmaEncoder(properties);
+        return new LzmaEncoder(this.ToDictionary());
     }
 }

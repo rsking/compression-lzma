@@ -40,11 +40,12 @@ public sealed class LzmaStream : Stream
         if (mode is System.IO.Compression.CompressionMode.Compress && this.stream.CanWrite)
         {
             this.encoder = new LzmaCompressionOptions().CreateEncoder();
+            this.encoder.WriteCoderProperties(this.stream);
         }
         else if (mode is System.IO.Compression.CompressionMode.Decompress && this.stream.CanRead)
         {
             var properties = new byte[5];
-            _ = this.stream.Read(properties, 0, 5);
+            _ = this.stream.Read(properties, 0, properties.Length);
             this.decoder = new(properties);
 
             this.outputSize = 0L;
@@ -103,29 +104,82 @@ public sealed class LzmaStream : Stream
     public override long Length => this.stream.Length;
 
     /// <inheritdoc/>
-    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override long Position { get => this.stream.Position; set => throw new NotSupportedException(); }
+
+    /// <summary>
+    /// Copies the specified stream into this stream.
+    /// </summary>
+    /// <param name="stream">The stream.</param>
+    /// <exception cref="InvalidOperationException">The encoder is <see langword="null"/>.</exception>
+    public void CopyFrom(Stream stream)
+    {
+        if (this.encoder is null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        this.SetLength(stream.Length);
+        this.encoder.Encode(stream, this.stream);
+    }
 
     /// <inheritdoc/>
-    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void SetLength(long value)
+    {
+        if (this.encoder is null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        // write out the length
+        for (var i = 0; i < 8; i++)
+        {
+            this.stream.WriteByte((byte)(value >> (8 * i)));
+        }
+    }
 
     /// <inheritdoc/>
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
     /// <inheritdoc/>
-    public override int Read(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+    public override int Read(byte[] buffer, int offset, int count)
+    {
+        if (this.decoder is null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        if (this.stream.Position < this.stream.Length && count > this.outputSize)
+        {
+            using var memoryStream = new MemoryStream(buffer, offset, count);
+            this.decoder.Decode(this.stream, memoryStream, this.outputSize);
+            return (int)this.outputSize;
+        }
+
+        return 0;
+    }
 
     /// <inheritdoc/>
-    public override void Write(byte[] buffer, int offset, int count) => throw new NotImplementedException();
+    public override void Write(byte[] buffer, int offset, int count)
+    {
+        if (this.encoder is null)
+        {
+            throw new InvalidOperationException();
+        }
+
+        using var memoryStream = new MemoryStream(buffer, offset, count);
+        this.encoder.Encode(memoryStream, this.stream);
+    }
 
 #if NETSTANDARD2_1_OR_GREATER
     /// <inheritdoc/>
     public override void CopyTo(Stream destination, int bufferSize)
     {
-        if (this.decoder is not null)
+        if (this.decoder is null)
         {
-            var compressedSize = this.stream.Length - this.stream.Position;
-            this.decoder.Decode(this.stream, destination, this.outputSize);
+            throw new InvalidOperationException();
         }
+
+        this.decoder.Decode(this.stream, destination, this.outputSize);
     }
 #endif
 

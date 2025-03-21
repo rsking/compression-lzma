@@ -8,8 +8,7 @@ namespace System.IO.Compression.Tests;
 
 public class LzmaEncoderTests
 {
-    [Fact]
-    public void Encode()
+    internal static IDictionary<CoderPropId, object> GetDefaultProperties()
     {
         var dictionary = 1 << 23;
         var posStateBits = 2;
@@ -20,7 +19,7 @@ public class LzmaEncoderTests
         var mf = "bt4";
         var eos = false;
 
-        var properties = new Dictionary<CoderPropId, object>
+        return new Dictionary<CoderPropId, object>
         {
             { CoderPropId.DictionarySize, dictionary },
             { CoderPropId.PosStateBits, posStateBits },
@@ -31,36 +30,39 @@ public class LzmaEncoderTests
             { CoderPropId.MatchFinder, mf },
             { CoderPropId.EndMarker, eos },
         };
+    }
 
+    [Fact]
+    public void Encode()
+    {
+        var encoder = new LzmaEncoder(GetDefaultProperties());
 
-        var encoder = new LzmaEncoder(properties);
+        using var output = new MemoryStream();
+        encoder.WriteCoderProperties(output);
 
-        using var outStream = new MemoryStream();
-        encoder.WriteCoderProperties(outStream);
-
-        using (var inStream = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.txt"))
+        using (var input = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.txt"))
         {
-            Assert.NotNull(inStream);
+            Assert.NotNull(input);
 
-            var fileSize = inStream.Length;
+            var fileSize = input.Length;
 
             for (var i = 0; i < 8; i++)
             {
-                outStream.WriteByte((byte)(fileSize >> (8 * i)));
+                output.WriteByte((byte)(fileSize >> (8 * i)));
             }
 
-            encoder.Encode(inStream, outStream);
+            encoder.Encode(input, output);
         }
 
-        outStream.Position = 0;
+        output.Position = 0;
 
         // compare the streams
         using var lzma = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.lzma");
 
         Assert.NotNull(lzma);
-        Assert.Equal(outStream.Length, lzma.Length);
+        Assert.Equal(output.Length, lzma.Length);
 
-        var bytesLeft = outStream.Length - outStream.Position;
+        var bytesLeft = output.Length - output.Position;
         while (bytesLeft > 0)
         {
             var bytesToRead = (int)Math.Min(bytesLeft, 128);
@@ -68,7 +70,7 @@ public class LzmaEncoderTests
             var first = new byte[bytesToRead];
             var second = new byte[bytesToRead];
 
-            var bytesRead = outStream.Read(first, 0, bytesToRead);
+            var bytesRead = output.Read(first, 0, bytesToRead);
 
             Assert.Equal(bytesRead, bytesToRead);
 
