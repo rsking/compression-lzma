@@ -175,11 +175,11 @@ internal class BinTree : InWindow, IMatchFinder
 
         if (this.hashArray)
         {
-            var temp = Crc.Table[this.BufferBase[cur]] ^ this.BufferBase[cur + 1];
+            var temp = Common.Crc.Table[this.BufferBase[cur]] ^ this.BufferBase[cur + 1];
             hash2Value = temp & (Hash2Size - 1);
             temp ^= (uint)this.BufferBase[cur + 2] << 8;
             hash3Value = temp & (Hash3Size - 1);
-            hashValue = (temp ^ (Crc.Table[this.BufferBase[cur + 3]] << 5)) & this.hashMask;
+            hashValue = (temp ^ (Common.Crc.Table[this.BufferBase[cur + 3]] << 5)) & this.hashMask;
         }
         else
         {
@@ -343,13 +343,13 @@ internal class BinTree : InWindow, IMatchFinder
 
             if (this.hashArray)
             {
-                var temp = Crc.Table[this.BufferBase[cur]] ^ this.BufferBase[cur + 1];
+                var temp = Common.Crc.Table[this.BufferBase[cur]] ^ this.BufferBase[cur + 1];
                 var hash2Value = temp & (Hash2Size - 1);
                 this.hash[hash2Value] = this.Pos;
                 temp ^= (uint)this.BufferBase[cur + 2] << 8;
                 var hash3Value = temp & (Hash3Size - 1);
                 this.hash[Hash3Offset + hash3Value] = this.Pos;
-                hashValue = (temp ^ (Crc.Table[this.BufferBase[cur + 3]] << 5)) & this.hashMask;
+                hashValue = (temp ^ (Common.Crc.Table[this.BufferBase[cur + 3]] << 5)) & this.hashMask;
             }
             else
             {

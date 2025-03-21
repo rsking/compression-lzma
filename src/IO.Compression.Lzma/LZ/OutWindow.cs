@@ -7,7 +7,7 @@
 namespace System.IO.Compression.LZ;
 
 /// <summary>
-/// The out window.
+/// The output window.
 /// </summary>
 internal class OutWindow
 {
@@ -63,7 +63,7 @@ internal class OutWindow
     public bool Train(Stream stream)
     {
         var len = stream.Length;
-        var size = (len < this.windowSize) ? (uint)len : this.windowSize;
+        var size = len < this.windowSize ? (uint)len : this.windowSize;
         this.TrainSize = size;
         stream.Position = len - size;
         this.streamPos = this.pos = 0U;

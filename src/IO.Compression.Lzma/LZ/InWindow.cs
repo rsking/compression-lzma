@@ -7,7 +7,7 @@
 namespace System.IO.Compression.LZ;
 
 /// <summary>
-/// The In window.
+/// The input window.
 /// </summary>
 internal class InWindow : IInWindowStream
 {

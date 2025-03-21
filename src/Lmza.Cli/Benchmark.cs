@@ -7,7 +7,7 @@
 namespace Lmza.Cli;
 
 using System.IO.Compression;
-using System.IO.Compression.LZ;
+using System.IO.Compression.Common;
 
 /// <summary>
 /// The bench marls.
