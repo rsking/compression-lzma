@@ -177,13 +177,5 @@ internal class Encoder
     /// </summary>
     /// <returns>The processing size add.</returns>
     /// <exception cref="InvalidOperationException">The stream is <see langword="null"/>.</exception>
-    public long GetProcessedSizeAdd()
-    {
-        if (this.stream is null)
-        {
-            throw new InvalidOperationException();
-        }
-
-        return this.cacheSize + this.stream.Position - this.startPosition + 4;
-    }
+    public long GetProcessedSizeAdd() => this.stream is null ? throw new InvalidOperationException() : this.cacheSize + this.stream.Position - this.startPosition + 4;
 }

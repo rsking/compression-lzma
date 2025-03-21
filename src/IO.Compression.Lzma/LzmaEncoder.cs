@@ -417,7 +417,7 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
                     }
 
                     var propertyNumFastBytes = (int)prop;
-                    if (propertyNumFastBytes < 5 || propertyNumFastBytes > LzmaBase.MatchMaxLen)
+                    if (propertyNumFastBytes is < 5 or > (int)LzmaBase.MatchMaxLen)
                     {
                         throw new InvalidDataException();
                     }
@@ -456,8 +456,8 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
                         throw new InvalidDataException();
                     }
 
-                    if (dictionarySizeProp < 1U << LzmaBase.DicLogSizeMin ||
-                        dictionarySizeProp > 1U << DicLogSizeMaxCompress)
+                    if (dictionarySizeProp is < (int)(1U << LzmaBase.DicLogSizeMin) or
+                        > (int)(1U << DicLogSizeMaxCompress))
                     {
                         throw new InvalidDataException();
                     }
@@ -481,7 +481,7 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
                         throw new InvalidDataException();
                     }
 
-                    if (posStateBitsProp < 0 || posStateBitsProp > (uint)LzmaBase.NumPosStatesBitsEncodingMax)
+                    if (posStateBitsProp is < 0 or > (int)(uint)LzmaBase.NumPosStatesBitsEncodingMax)
                     {
                         throw new InvalidDataException();
                     }
@@ -496,7 +496,7 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
                         throw new InvalidDataException();
                     }
 
-                    if (numLiteralPosStateBitsProp < 0 || numLiteralPosStateBitsProp > LzmaBase.NumLitPosStatesBitsEncodingMax)
+                    if (numLiteralPosStateBitsProp is < 0 or > (int)LzmaBase.NumLitPosStatesBitsEncodingMax)
                     {
                         throw new InvalidDataException();
                     }
@@ -510,7 +510,7 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
                         throw new InvalidDataException();
                     }
 
-                    if (numLiteralContextBitsProp < 0 || numLiteralContextBitsProp > LzmaBase.NumLitContextBitsMax)
+                    if (numLiteralContextBitsProp is < 0 or > (int)LzmaBase.NumLitContextBitsMax)
                     {
                         throw new InvalidDataException();
                     }
@@ -720,15 +720,9 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
     {
         uint price;
         var lenToPosState = LzmaBase.GetLenToPosState(len);
-        if (pos < LzmaBase.NumFullDistances)
-        {
-            price = this.distancesPrices[(lenToPosState * LzmaBase.NumFullDistances) + pos];
-        }
-        else
-        {
-            price = this.posSlotPrices[(lenToPosState << LzmaBase.NumPosSlotBits) + GetPosSlot2(pos)] +
-                this.alignPrices[pos & LzmaBase.AlignMask];
-        }
+        price = pos < LzmaBase.NumFullDistances
+            ? this.distancesPrices[(lenToPosState * LzmaBase.NumFullDistances) + pos]
+            : this.posSlotPrices[(lenToPosState << LzmaBase.NumPosSlotBits) + GetPosSlot2(pos)] + this.alignPrices[pos & LzmaBase.AlignMask];
 
         return price + this.lenEncoder.GetPrice(len - LzmaBase.MatchMinLen, posState);
 
@@ -1477,15 +1471,9 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
             }
         }
 
-        public Encoder2 GetSubCoder(uint pos, byte prevByte)
-        {
-            if (this.coders is null)
-            {
-                throw new InvalidOperationException();
-            }
-
-            return this.coders[((pos & this.posMask) << this.numPrevBits) + (uint)(prevByte >> (8 - this.numPrevBits))];
-        }
+        public Encoder2 GetSubCoder(uint pos, byte prevByte) => this.coders is null
+                ? throw new InvalidOperationException()
+                : this.coders[((pos & this.posMask) << this.numPrevBits) + (uint)(prevByte >> (8 - this.numPrevBits))];
 
         public readonly struct Encoder2
         {

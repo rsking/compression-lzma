@@ -85,15 +85,7 @@ internal class InWindow : IInWindowStream
     }
 
     /// <inheritdoc/>
-    public byte GetIndexByte(int index)
-    {
-        if (this.BufferBase is null)
-        {
-            throw new InvalidOperationException();
-        }
-
-        return this.BufferBase[this.BufferOffset + this.Pos + index];
-    }
+    public byte GetIndexByte(int index) => this.BufferBase is null ? throw new InvalidOperationException() : this.BufferBase[this.BufferOffset + this.Pos + index];
 
     /// <inheritdoc/>
     public uint GetMatchLen(int index, uint distance, uint limit)
@@ -198,7 +190,7 @@ internal class InWindow : IInWindowStream
 
         while (true)
         {
-            var size = (int)((0 - this.BufferOffset) + this.blockSize - this.StreamPos);
+            var size = (int)(0 - this.BufferOffset + this.blockSize - this.StreamPos);
             if (size is 0)
             {
                 return;

@@ -149,12 +149,7 @@ internal abstract class LzmaBase
     public static uint GetLenToPosState(uint len)
     {
         len -= MatchMinLen;
-        if (len < NumLenToPosStates)
-        {
-            return len;
-        }
-
-        return NumLenToPosStates - 1;
+        return len < NumLenToPosStates ? len : NumLenToPosStates - 1;
     }
 
     /// <summary>

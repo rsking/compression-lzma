@@ -1,4 +1,10 @@
-﻿namespace System.IO.Compression.Tests;
+﻿// -----------------------------------------------------------------------
+// <copyright file="LzmaDecoderTests.cs" company="KingR">
+// Copyright (c) KingR. All rights reserved.
+// </copyright>
+// -----------------------------------------------------------------------
+
+namespace System.IO.Compression.Tests;
 
 public class LzmaDecoderTests
 {
@@ -10,7 +16,7 @@ public class LzmaDecoderTests
         Assert.NotNull(lzma);
 
         var properties = new byte[5];
-        lzma.Read(properties, 0, 5);
+        _ = lzma.Read(properties, 0, 5);
 
         var decoder = new LzmaDecoder();
         decoder.SetDecoderProperties(properties);
@@ -21,7 +27,7 @@ public class LzmaDecoderTests
             var v = lzma.ReadByte();
             if (v < 0)
             {
-                throw (new Exception("Can't Read 1"));
+                throw new Exception("Can't Read 1");
             }
 
             outSize |= ((long)(byte)v) << (8 * i);
