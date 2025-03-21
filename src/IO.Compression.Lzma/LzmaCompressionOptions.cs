@@ -74,8 +74,5 @@ public sealed class LzmaCompressionOptions
     /// Creates the encoder.
     /// </summary>
     /// <returns>The created encoder.</returns>
-    internal LzmaEncoder CreateEncoder()
-    {
-        return new LzmaEncoder(this.ToDictionary());
-    }
+    internal LzmaEncoder CreateEncoder() => new(this.ToDictionary());
 }

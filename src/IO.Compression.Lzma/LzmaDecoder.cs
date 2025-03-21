@@ -133,15 +133,9 @@ public class LzmaDecoder
     {
         this.SetOutputStream(output);
 
-        ulong size;
-        if (outputSize < 0)
-        {
-            size = ulong.MaxValue;
-        }
-        else
-        {
-            size = this.bytesRead + (ulong)outputSize - (ulong)this.outWindow.BytesToWrite;
-        }
+        var size = outputSize < 0
+            ? ulong.MaxValue
+            : this.bytesRead + (ulong)outputSize - (ulong)this.outWindow.BytesToWrite;
 
         this.Decode(ref this.state, ref this.bytesRead, this.firstRead, size);
         this.firstRead = false;
@@ -335,7 +329,7 @@ public class LzmaDecoder
                 throw new InvalidDataException();
             }
 
-            this.outWindow.CopyBlock(rep0, len);
+            _ = this.outWindow.CopyBlock(rep0, len);
             nowPos64 += len;
         }
     }

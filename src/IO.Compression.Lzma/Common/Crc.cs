@@ -32,7 +32,7 @@ internal class Crc
     /// Updates this instance.
     /// </summary>
     /// <param name="data">The data.</param>
-    public void Update(byte data) => this.value = Table[(byte)this.value ^ data] ^ this.value >> 8;
+    public void Update(byte data) => this.value = Table[(byte)this.value ^ data] ^ (this.value >> 8);
 
     /// <summary>
     /// Updates this instance.
@@ -44,7 +44,7 @@ internal class Crc
     {
         for (var i = 0U; i < size; i++)
         {
-            this.value = Table[(byte)this.value ^ data[offset + i]] ^ this.value >> 8;
+            this.value = Table[(byte)this.value ^ data[offset + i]] ^ (this.value >> 8);
         }
     }
 
@@ -59,7 +59,7 @@ internal class Crc
             {
                 if ((r & 1U) is not 0U)
                 {
-                    r = r >> 1 ^ Poly;
+                    r = (r >> 1) ^ Poly;
                 }
                 else
                 {
