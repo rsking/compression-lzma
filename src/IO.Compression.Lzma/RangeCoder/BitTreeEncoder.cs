@@ -63,7 +63,7 @@ internal readonly struct BitTreeEncoder(int numBitLevels)
     /// </summary>
     public void Init()
     {
-        for (var i = 1U; i < (1 << this.numBitLevels); i++)
+        for (var i = 1U; i < this.models.Length; i++)
         {
             this.models[i].Init();
         }

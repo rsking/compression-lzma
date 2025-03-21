@@ -12,15 +12,8 @@ namespace System.IO.Compression.RangeCoder;
 /// <param name="numBitLevels">The number of bit levels.</param>
 internal readonly struct BitTreeDecoder(int numBitLevels)
 {
-    /// <summary>
-    /// Gets the models.
-    /// </summary>
-    public BitDecoder[] Models { get; } = new BitDecoder[1 << numBitLevels];
-
-    /// <summary>
-    /// Gets the number of bit levels.
-    /// </summary>
-    public int NumBitLevels { get; } = numBitLevels;
+    private readonly BitDecoder[] models = new BitDecoder[1 << numBitLevels];
+    private readonly int numBitLevels = numBitLevels;
 
     /// <summary>
     /// Reverse decodes the value.
@@ -50,9 +43,9 @@ internal readonly struct BitTreeDecoder(int numBitLevels)
     /// </summary>
     public readonly void Init()
     {
-        for (var i = 1; i < (1 << this.NumBitLevels); i++)
+        for (var i = 1; i < this.models.Length; i++)
         {
-            this.Models[i].Init();
+            this.models[i].Init();
         }
     }
 
@@ -64,12 +57,12 @@ internal readonly struct BitTreeDecoder(int numBitLevels)
     public uint Decode(Decoder rangeDecoder)
     {
         var m = 1U;
-        for (var bitIndex = this.NumBitLevels; bitIndex > 0; bitIndex--)
+        for (var bitIndex = this.numBitLevels; bitIndex > 0; bitIndex--)
         {
-            m = (m << 1) + this.Models[m].Decode(rangeDecoder);
+            m = (m << 1) + this.models[m].Decode(rangeDecoder);
         }
 
-        return m - (1U << this.NumBitLevels);
+        return m - (1U << this.numBitLevels);
     }
 
     /// <summary>
@@ -81,9 +74,9 @@ internal readonly struct BitTreeDecoder(int numBitLevels)
     {
         var m = 1U;
         var symbol = 0U;
-        for (var bitIndex = 0; bitIndex < this.NumBitLevels; bitIndex++)
+        for (var bitIndex = 0; bitIndex < this.numBitLevels; bitIndex++)
         {
-            var bit = this.Models[m].Decode(rangeDecoder);
+            var bit = this.models[m].Decode(rangeDecoder);
             m <<= 1;
             m += bit;
             symbol |= bit << bitIndex;

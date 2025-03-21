@@ -74,29 +74,6 @@ internal class Encoder
     public void FlushStream() => this.stream?.Flush();
 
     /// <summary>
-    /// Closes the stream.
-    /// </summary>
-    public void CloseStream() => this.stream?.Close();
-
-    /// <summary>
-    /// Encodes.
-    /// </summary>
-    /// <param name="start">The start.</param>
-    /// <param name="size">The size.</param>
-    /// <param name="total">The total.</param>
-    public void Encode(uint start, uint size, uint total)
-    {
-        this.Range /= total;
-        this.Low += start * this.Range;
-        this.Range *= size;
-        while (this.Range < TopValue)
-        {
-            this.Range <<= 8;
-            this.ShiftLow();
-        }
-    }
-
-    /// <summary>
     /// Shifts low.
     /// </summary>
     /// <exception cref="InvalidOperationException">The stream is <see langword="null"/>.</exception>
@@ -143,32 +120,6 @@ internal class Encoder
                 this.Range <<= 8;
                 this.ShiftLow();
             }
-        }
-    }
-
-    /// <summary>
-    /// Encodes the bits.
-    /// </summary>
-    /// <param name="size0">The size.</param>
-    /// <param name="numTotalBits">The number of total bits.</param>
-    /// <param name="symbol">The symbol.</param>
-    public void EncodeBit(uint size0, int numTotalBits, uint symbol)
-    {
-        var newBound = (this.Range >> numTotalBits) * size0;
-        if (symbol is 0)
-        {
-            this.Range = newBound;
-        }
-        else
-        {
-            this.Low += newBound;
-            this.Range -= newBound;
-        }
-
-        while (this.Range < TopValue)
-        {
-            this.Range <<= 8;
-            this.ShiftLow();
         }
     }
 

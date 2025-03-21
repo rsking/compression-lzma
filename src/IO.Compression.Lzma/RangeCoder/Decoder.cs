@@ -53,11 +53,6 @@ internal class Decoder
     public void ReleaseStream() => this.Stream = null;
 
     /// <summary>
-    /// Closes the stream.
-    /// </summary>
-    public void CloseStream() => this.Stream?.Close();
-
-    /// <summary>
     /// Normalizes the decoder.
     /// </summary>
     public void Normalize()
@@ -72,30 +67,6 @@ internal class Decoder
             this.Code = (this.Code << 8) | (byte)this.Stream.ReadByte();
             this.Range <<= 8;
         }
-    }
-
-    /// <summary>
-    /// Gets the threshold.
-    /// </summary>
-    /// <param name="total">The total.</param>
-    /// <returns>The threshold.</returns>
-    public uint GetThreshold(uint total)
-    {
-        this.Range /= total;
-        return this.Code / this.Range;
-    }
-
-    /// <summary>
-    /// Decodes the values.
-    /// </summary>
-    /// <param name="start">The start.</param>
-    /// <param name="size">The size.</param>
-    /// <param name="total">The total.</param>
-    public void Decode(uint start, uint size, uint total)
-    {
-        this.Code -= start * this.Range;
-        this.Range *= size;
-        this.Normalize();
     }
 
     /// <summary>

@@ -21,7 +21,7 @@ internal struct BitDecoder
     /// </summary>
     public const uint BitModelTotal = 1 << NumBitModelTotalBits;
     private const int NumMoveBits = 5;
-    private uint prob;
+    private uint probability;
 
     /// <summary>
     /// Updates the model.
@@ -32,18 +32,18 @@ internal struct BitDecoder
     {
         if (symbol is 0U)
         {
-            this.prob += (BitModelTotal - this.prob) >> numMoveBits;
+            this.probability += (BitModelTotal - this.probability) >> numMoveBits;
         }
         else
         {
-            this.prob -= this.prob >> numMoveBits;
+            this.probability -= this.probability >> numMoveBits;
         }
     }
 
     /// <summary>
     /// Initializes this instance.
     /// </summary>
-    public void Init() => this.prob = BitModelTotal >> 1;
+    public void Init() => this.probability = BitModelTotal >> 1;
 
     /// <summary>
     /// Decodes the value.
@@ -52,11 +52,11 @@ internal struct BitDecoder
     /// <returns>The decoded value.</returns>
     public uint Decode(Decoder rangeDecoder)
     {
-        var newBound = (rangeDecoder.Range >> NumBitModelTotalBits) * this.prob;
+        var newBound = (rangeDecoder.Range >> NumBitModelTotalBits) * this.probability;
         if (rangeDecoder.Code < newBound)
         {
             rangeDecoder.Range = newBound;
-            this.prob += (BitModelTotal - this.prob) >> NumMoveBits;
+            this.probability += (BitModelTotal - this.probability) >> NumMoveBits;
             if (rangeDecoder.Range < Decoder.TopValue && rangeDecoder.Stream is not null)
             {
                 rangeDecoder.Code = (rangeDecoder.Code << 8) | (byte)rangeDecoder.Stream.ReadByte();
@@ -68,7 +68,7 @@ internal struct BitDecoder
 
         rangeDecoder.Range -= newBound;
         rangeDecoder.Code -= newBound;
-        this.prob -= this.prob >> NumMoveBits;
+        this.probability -= this.probability >> NumMoveBits;
         if (rangeDecoder.Range < Decoder.TopValue && rangeDecoder.Stream is not null)
         {
             rangeDecoder.Code = (rangeDecoder.Code << 8) | (byte)rangeDecoder.Stream.ReadByte();

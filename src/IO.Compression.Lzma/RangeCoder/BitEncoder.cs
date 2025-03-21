@@ -24,12 +24,12 @@ internal struct BitEncoder
 
     private static readonly uint[] ProbPrices = GetPropPrices();
 
-    private uint prob;
+    private uint probability;
 
     /// <summary>
     /// Initializes this instance.
     /// </summary>
-    public void Init() => this.prob = BitModelTotal >> 1;
+    public void Init() => this.probability = BitModelTotal >> 1;
 
     /// <summary>
     /// Updates the model.
@@ -39,11 +39,11 @@ internal struct BitEncoder
     {
         if (symbol is 0U)
         {
-            this.prob += (BitModelTotal - this.prob) >> NumMoveBits;
+            this.probability += (BitModelTotal - this.probability) >> NumMoveBits;
         }
         else
         {
-            this.prob -= this.prob >> NumMoveBits;
+            this.probability -= this.probability >> NumMoveBits;
         }
     }
 
@@ -54,17 +54,17 @@ internal struct BitEncoder
     /// <param name="symbol">The symbol.</param>
     public void Encode(Encoder encoder, uint symbol)
     {
-        var newBound = (encoder.Range >> NumBitModelTotalBits) * this.prob;
+        var newBound = (encoder.Range >> NumBitModelTotalBits) * this.probability;
         if (symbol is 0)
         {
             encoder.Range = newBound;
-            this.prob += (BitModelTotal - this.prob) >> NumMoveBits;
+            this.probability += (BitModelTotal - this.probability) >> NumMoveBits;
         }
         else
         {
             encoder.Low += newBound;
             encoder.Range -= newBound;
-            this.prob -= this.prob >> NumMoveBits;
+            this.probability -= this.probability >> NumMoveBits;
         }
 
         if (encoder.Range < Encoder.TopValue)
@@ -79,19 +79,19 @@ internal struct BitEncoder
     /// </summary>
     /// <param name="symbol">The symbol.</param>
     /// <returns>The price.</returns>
-    public readonly uint GetPrice(uint symbol) => ProbPrices[(((this.prob - symbol) ^ (-(int)symbol)) & (BitModelTotal - 1)) >> NumMoveReducingBits];
+    public readonly uint GetPrice(uint symbol) => ProbPrices[(((this.probability - symbol) ^ (-(int)symbol)) & (BitModelTotal - 1)) >> NumMoveReducingBits];
 
     /// <summary>
     /// GEts the zero price.
     /// </summary>
     /// <returns>The zero price.</returns>
-    public readonly uint GetPrice0() => ProbPrices[this.prob >> NumMoveReducingBits];
+    public readonly uint GetPrice0() => ProbPrices[this.probability >> NumMoveReducingBits];
 
     /// <summary>
     /// Gets the one price.
     /// </summary>
     /// <returns>The one price.</returns>
-    public readonly uint GetPrice1() => ProbPrices[(BitModelTotal - this.prob) >> NumMoveReducingBits];
+    public readonly uint GetPrice1() => ProbPrices[(BitModelTotal - this.probability) >> NumMoveReducingBits];
 
     private static uint[] GetPropPrices()
     {
