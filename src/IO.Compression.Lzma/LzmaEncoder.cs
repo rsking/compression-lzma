@@ -9,14 +9,12 @@ namespace System.IO.Compression;
 /// <summary>
 /// The LZMA encoder.
 /// </summary>
-public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
+public class LzmaEncoder
 {
     private const uint IfinityPrice = uint.MaxValue;
     private const int DefaultDictionaryLogSize = 22;
     private const uint NumFastBytesDefault = 0x20U;
     private const uint NumOpts = 1U << 12;
-
-    private const int PropSize = 5;
 
     private static readonly byte[] FastPos = new byte[1 << 11];
 
@@ -56,8 +54,6 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
 
     private readonly uint[] reps = new uint[LzmaBase.NumRepDistances];
     private readonly uint[] repLens = new uint[LzmaBase.NumRepDistances];
-
-    private readonly byte[] properties = new byte[PropSize];
 
     private readonly uint[] tempPrices = new uint[LzmaBase.NumFullDistances];
     private uint matchPriceCount;
@@ -121,7 +117,8 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
     /// <summary>
     /// Initializes a new instance of the <see cref="LzmaEncoder"/> class.
     /// </summary>
-    public LzmaEncoder()
+    /// <param name="properties">The properties.</param>
+    public LzmaEncoder(IDictionary<CoderPropId, object> properties)
     {
         for (var i = 0; i < NumOpts; i++)
         {
@@ -132,6 +129,151 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
         {
             this.posSlotEncoder[i] = new RangeCoder.BitTreeEncoder(LzmaBase.NumPosSlotBits);
         }
+
+        SetCoderProperties(properties);
+
+        void SetCoderProperties(IDictionary<CoderPropId, object> properties)
+        {
+            foreach (var kvp in properties)
+            {
+                var prop = kvp.Value;
+                switch (kvp.Key)
+                {
+                    case CoderPropId.NumFastBytes:
+                        if (prop is not int)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        var propertyNumFastBytes = (int)prop;
+                        if (propertyNumFastBytes is < 5 or > (int)LzmaBase.MatchMaxLen)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        this.numFastBytes = (uint)propertyNumFastBytes;
+                        break;
+
+                    case CoderPropId.Algorithm:
+                        break;
+                    case CoderPropId.MatchFinder:
+                        if (prop is not string stringProp)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        var matchFinderIndexPrev = this.matchFinderType;
+                        var m = FindMatchFinder(stringProp.ToUpperInvariant());
+                        if (m < 0)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        this.matchFinderType = (EMatchFinderType)m;
+                        if (this.matchFinder != null && matchFinderIndexPrev != this.matchFinderType)
+                        {
+                            this.dictionarySizePrev = uint.MaxValue;
+                            this.matchFinder = null;
+                        }
+
+                        break;
+
+                    case CoderPropId.DictionarySize:
+                        const int DicLogSizeMaxCompress = 30;
+                        if (prop is not int dictionarySizeProp)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        if (dictionarySizeProp is < (int)(1U << LzmaBase.DicLogSizeMin) or
+                            > (int)(1U << DicLogSizeMaxCompress))
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        this.dictionarySize = (uint)dictionarySizeProp;
+                        int dicLogSize;
+                        for (dicLogSize = 0; dicLogSize < DicLogSizeMaxCompress; dicLogSize++)
+                        {
+                            if (dictionarySizeProp <= (1U << dicLogSize))
+                            {
+                                break;
+                            }
+                        }
+
+                        this.distTableSize = (uint)dicLogSize * 2;
+                        break;
+
+                    case CoderPropId.PosStateBits:
+                        if (prop is not int posStateBitsProp)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        if (posStateBitsProp is < 0 or > (int)(uint)LzmaBase.NumPosStatesBitsEncodingMax)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        this.posStateBits = posStateBitsProp;
+                        this.posStateMask = (1U << this.posStateBits) - 1;
+                        break;
+
+                    case CoderPropId.LitPosBits:
+                        if (prop is not int numLiteralPosStateBitsProp)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        if (numLiteralPosStateBitsProp is < 0 or > (int)LzmaBase.NumLitPosStatesBitsEncodingMax)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        this.numLiteralPosStateBits = numLiteralPosStateBitsProp;
+                        break;
+
+                    case CoderPropId.LitContextBits:
+                        if (prop is not int numLiteralContextBitsProp)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        if (numLiteralContextBitsProp is < 0 or > (int)LzmaBase.NumLitContextBitsMax)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        this.numLiteralContextBits = numLiteralContextBitsProp;
+                        break;
+
+                    case CoderPropId.EndMarker:
+                        if (prop is not bool boolProp)
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        this.SetWriteEndMarkerMode(boolProp);
+                        break;
+
+                    default:
+                        throw new InvalidDataException();
+                }
+            }
+
+            static int FindMatchFinder(string s)
+            {
+                for (var m = 0; m < MatchFinderIDs.Length; m++)
+                {
+                    if (string.Equals(s, MatchFinderIDs[m], StringComparison.Ordinal))
+                    {
+                        return m;
+                    }
+                }
+
+                return -1;
+            }
+        }
     }
 
     private enum EMatchFinderType
@@ -140,13 +282,18 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
         BT4,
     }
 
-    /// <inheritdoc/>
-    public void Code(Stream inStream, Stream outStream, long inSize = -1, long outSize = -1, Action<long, long>? progress = null)
+    /// <summary>
+    /// Encodes the input stream to the output.
+    /// </summary>
+    /// <param name="input">The input stream.</param>
+    /// <param name="output">The output stream.</param>
+    /// <param name="progress">The progress.</param>
+    public void Encode(Stream input, Stream output, Action<long, long>? progress = null)
     {
         this.needReleaseMFStream = false;
         try
         {
-            SetStreams(inStream, outStream);
+            SetStreams(input, output);
             while (true)
             {
                 this.CodeOneBlock(out var processedInSize, out var processedOutSize, out var isFinished);
@@ -402,160 +549,22 @@ public class LzmaEncoder : ICoder, ISetCoderProperties, IWriteCoderProperties
         }
     }
 
-    /// <inheritdoc/>
-    public void SetCoderProperties(CoderPropId[] propIDs, object[] properties)
+    /// <summary>
+    /// Writes the coder properties.
+    /// </summary>
+    /// <param name="output">The stream to write to.</param>
+    public void WriteCoderProperties(Stream output)
     {
-        for (var i = 0; i < properties.Length; i++)
-        {
-            var prop = properties[i];
-            switch (propIDs[i])
-            {
-                case CoderPropId.NumFastBytes:
-                    if (prop is not int)
-                    {
-                        throw new InvalidDataException();
-                    }
+        byte[] properties =
+        [
+            (byte)((((this.posStateBits * 5) + this.numLiteralPosStateBits) * 9) + this.numLiteralContextBits),
+            (byte)((this.dictionarySize >> 0) & byte.MaxValue),
+            (byte)((this.dictionarySize >> 8) & byte.MaxValue),
+            (byte)((this.dictionarySize >> 16) & byte.MaxValue),
+            (byte)((this.dictionarySize >> 24) & byte.MaxValue),
+        ];
 
-                    var propertyNumFastBytes = (int)prop;
-                    if (propertyNumFastBytes is < 5 or > (int)LzmaBase.MatchMaxLen)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    this.numFastBytes = (uint)propertyNumFastBytes;
-                    break;
-
-                case CoderPropId.Algorithm:
-                    break;
-                case CoderPropId.MatchFinder:
-                    if (prop is not string stringProp)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    var matchFinderIndexPrev = this.matchFinderType;
-                    var m = FindMatchFinder(stringProp.ToUpperInvariant());
-                    if (m < 0)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    this.matchFinderType = (EMatchFinderType)m;
-                    if (this.matchFinder != null && matchFinderIndexPrev != this.matchFinderType)
-                    {
-                        this.dictionarySizePrev = uint.MaxValue;
-                        this.matchFinder = null;
-                    }
-
-                    break;
-
-                case CoderPropId.DictionarySize:
-                    const int DicLogSizeMaxCompress = 30;
-                    if (prop is not int dictionarySizeProp)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    if (dictionarySizeProp is < (int)(1U << LzmaBase.DicLogSizeMin) or
-                        > (int)(1U << DicLogSizeMaxCompress))
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    this.dictionarySize = (uint)dictionarySizeProp;
-                    int dicLogSize;
-                    for (dicLogSize = 0; dicLogSize < DicLogSizeMaxCompress; dicLogSize++)
-                    {
-                        if (dictionarySizeProp <= (1U << dicLogSize))
-                        {
-                            break;
-                        }
-                    }
-
-                    this.distTableSize = (uint)dicLogSize * 2;
-                    break;
-
-                case CoderPropId.PosStateBits:
-                    if (prop is not int posStateBitsProp)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    if (posStateBitsProp is < 0 or > (int)(uint)LzmaBase.NumPosStatesBitsEncodingMax)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    this.posStateBits = posStateBitsProp;
-                    this.posStateMask = (1U << this.posStateBits) - 1;
-                    break;
-
-                case CoderPropId.LitPosBits:
-                    if (prop is not int numLiteralPosStateBitsProp)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    if (numLiteralPosStateBitsProp is < 0 or > (int)LzmaBase.NumLitPosStatesBitsEncodingMax)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    this.numLiteralPosStateBits = numLiteralPosStateBitsProp;
-                    break;
-
-                case CoderPropId.LitContextBits:
-                    if (prop is not int numLiteralContextBitsProp)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    if (numLiteralContextBitsProp is < 0 or > (int)LzmaBase.NumLitContextBitsMax)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    this.numLiteralContextBits = numLiteralContextBitsProp;
-                    break;
-
-                case CoderPropId.EndMarker:
-                    if (prop is not bool boolProp)
-                    {
-                        throw new InvalidDataException();
-                    }
-
-                    this.SetWriteEndMarkerMode(boolProp);
-                    break;
-
-                default:
-                    throw new InvalidDataException();
-            }
-        }
-
-        static int FindMatchFinder(string s)
-        {
-            for (var m = 0; m < MatchFinderIDs.Length; m++)
-            {
-                if (string.Equals(s, MatchFinderIDs[m], StringComparison.Ordinal))
-                {
-                    return m;
-                }
-            }
-
-            return -1;
-        }
-    }
-
-    /// <inheritdoc/>
-    public void WriteCoderProperties(Stream outStream)
-    {
-        this.properties[0] = (byte)((((this.posStateBits * 5) + this.numLiteralPosStateBits) * 9) + this.numLiteralContextBits);
-        for (var i = 0; i < 4; i++)
-        {
-            this.properties[1 + i] = (byte)((this.dictionarySize >> (8 * i)) & byte.MaxValue);
-        }
-
-        outStream.Write(this.properties, 0, PropSize);
+        output.Write(properties, 0, properties.Length);
     }
 
     /// <summary>

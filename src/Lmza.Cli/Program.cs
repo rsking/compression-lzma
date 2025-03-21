@@ -101,31 +101,19 @@ encodeCommand.SetAction(parseResult =>
     var mf = parseResult.GetValue(matchFinderOption)!;
     var eos = parseResult.GetValue(eosOption);
 
-    CoderPropId[] propIDs =
-    [
-        CoderPropId.DictionarySize,
-        CoderPropId.PosStateBits,
-        CoderPropId.LitContextBits,
-        CoderPropId.LitPosBits,
-        CoderPropId.Algorithm,
-        CoderPropId.NumFastBytes,
-        CoderPropId.MatchFinder,
-        CoderPropId.EndMarker,
-    ];
-    object[] properties =
-    [
-        dictionary,
-        posStateBits,
-        litContextBits,
-        litPosBits,
-        algorithm,
-        numFastBytes,
-        mf,
-        eos,
-    ];
+    var properties = new Dictionary<CoderPropId, object>
+    {
+        { CoderPropId.DictionarySize, dictionary },
+        { CoderPropId.PosStateBits, posStateBits },
+        { CoderPropId.LitContextBits, litContextBits },
+        { CoderPropId.LitPosBits, litPosBits },
+        { CoderPropId.Algorithm, algorithm },
+        { CoderPropId.NumFastBytes, numFastBytes },
+        { CoderPropId.MatchFinder, mf },
+        { CoderPropId.EndMarker, eos },
+    };
 
-    LzmaEncoder encoder = new();
-    encoder.SetCoderProperties(propIDs, properties);
+    LzmaEncoder encoder = new(properties);
     output?.Directory?.Create();
     using var outStream = output?.OpenWrite();
     if (outStream is not null)
@@ -139,7 +127,7 @@ encodeCommand.SetAction(parseResult =>
             outStream.WriteByte((byte)(fileSize >> (8 * i)));
         }
 
-        encoder.Code(inStream, outStream, -1, -1, progress: null);
+        encoder.Encode(inStream, outStream, progress: null);
     }
 });
 
@@ -152,33 +140,30 @@ var decodeCommand = new CliCommand("decode")
 decodeCommand.Aliases.Add("d");
 decodeCommand.SetAction(parseResult =>
 {
-    using var inStream = parseResult.GetValue(inputArgument)!.OpenRead();
+    using var input = parseResult.GetValue(inputArgument)!.OpenRead();
 
     var properties = new byte[5];
-    if (inStream.Read(properties, 0, 5) != 5)
+    if (input.Read(properties, 0, 5) != 5)
     {
         throw new InvalidDataException("input .lzma is too short");
     }
 
-    LzmaDecoder decoder = new();
-    decoder.SetDecoderProperties(properties);
+    LzmaDecoder decoder = new(properties);
 
-    var outSize = 0L;
+    var outputSize = 0L;
     for (var i = 0; i < 8; i++)
     {
-        var v = inStream.ReadByte();
+        var v = input.ReadByte();
         if (v < 0)
         {
             throw new InvalidDataException("Can't Read 1");
         }
 
-        outSize |= ((long)(byte)v) << (8 * i);
+        outputSize |= ((long)(byte)v) << (8 * i);
     }
 
-    var compressedSize = inStream.Length - inStream.Position;
-
-    using var outStream = parseResult.GetValue(outputArgument)!.OpenWrite();
-    decoder.Code(inStream, outStream, compressedSize, outSize, progress: null);
+    using var output = parseResult.GetValue(outputArgument)!.OpenWrite();
+    decoder.Decode(input, output, outputSize);
 });
 
 var iterationOption = new CliOption<int>("-i") { DefaultValueFactory = _ => 10 };

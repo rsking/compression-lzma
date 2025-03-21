@@ -9,7 +9,7 @@ namespace System.IO.Compression;
 /// <summary>
 /// The LZMA decoder.
 /// </summary>
-internal class LzmaDecoder : ICoder, ISetDecoderProperties
+internal class LzmaDecoder
 {
     private readonly LZ.OutWindow outWindow = new();
     private readonly RangeCoder.Decoder rangeDecoder = new();
@@ -41,19 +41,93 @@ internal class LzmaDecoder : ICoder, ISetDecoderProperties
     /// <summary>
     /// Initializes a new instance of the <see cref="LzmaDecoder"/> class.
     /// </summary>
-    public LzmaDecoder()
+    /// <param name="properties">The properties.</param>
+    public LzmaDecoder(byte[] properties)
     {
         this.dictionarySize = uint.MaxValue;
         for (var i = 0; i < LzmaBase.NumLenToPosStates; i++)
         {
             this.posSlotDecoder[i] = new(LzmaBase.NumPosSlotBits);
         }
+
+        SetDecoderProperties(properties);
+
+        void SetDecoderProperties(byte[] properties)
+        {
+            if (properties.Length < 5)
+            {
+                throw new ArgumentOutOfRangeException(nameof(properties));
+            }
+
+            var lc = properties[0] % 9;
+            var remainder = properties[0] / 9;
+            var lp = remainder % 5;
+            var pb = remainder / 5;
+            if (pb > LzmaBase.NumPosStatesBitsMax)
+            {
+                throw new InvalidDataException();
+            }
+
+            var currentDictionarySize = 0U;
+            for (var i = 0; i < 4; i++)
+            {
+                currentDictionarySize += ((uint)properties[1 + i]) << (i * 8);
+            }
+
+            SetDictionarySize(currentDictionarySize);
+            SetLiteralProperties(lp, lc);
+            SetPosBitsProperties(pb);
+
+            void SetDictionarySize(uint dictionarySize)
+            {
+                if (this.dictionarySize != dictionarySize)
+                {
+                    this.dictionarySize = dictionarySize;
+                    this.dictionarySizeCheck = Math.Max(this.dictionarySize, 1);
+                    var blockSize = Math.Max(this.dictionarySizeCheck, 1 << 12);
+                    this.outWindow.Create(blockSize);
+                }
+            }
+
+            void SetLiteralProperties(int lp, int lc)
+            {
+                if (lp > 8)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(lp));
+                }
+
+                if (lc > 8)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(lc));
+                }
+
+                this.literalDecoder.Create(lp, lc);
+            }
+
+            void SetPosBitsProperties(int pb)
+            {
+                if (pb > LzmaBase.NumPosStatesBitsMax)
+                {
+                    throw new InvalidDataException();
+                }
+
+                var numPosStates = 1U << pb;
+                this.lenDecoder.Create(numPosStates);
+                this.repLenDecoder.Create(numPosStates);
+                this.posStateMask = numPosStates - 1;
+            }
+        }
     }
 
-    /// <inheritdoc/>
-    public void Code(Stream inStream, Stream outStream, long inSize = -1, long outSize = -1, Action<long, long>? progress = null)
+    /// <summary>
+    /// Decodes the input stream to the output.
+    /// </summary>
+    /// <param name="input">The input stream.</param>
+    /// <param name="output">The output stream.</param>
+    /// <param name="outputSize">The output size.</param>
+    public void Decode(Stream input, Stream output, long outputSize = -1)
     {
-        this.Init(inStream, outStream);
+        this.Init(input, output);
 
         LzmaBase.State state = default;
         state.Init();
@@ -63,12 +137,12 @@ internal class LzmaDecoder : ICoder, ISetDecoderProperties
         var rep3 = 0U;
 
         var nowPos64 = 0UL;
-        var outSize64 = (ulong)outSize;
+        var outSize64 = (ulong)outputSize;
         if (nowPos64 < outSize64)
         {
             if (this.isMatchDecoders[state.Index << LzmaBase.NumPosStatesBitsMax].Decode(this.rangeDecoder) is not 0U)
             {
-                throw new System.Data.DataException();
+                throw new InvalidDataException();
             }
 
             state.UpdateChar();
@@ -182,34 +256,6 @@ internal class LzmaDecoder : ICoder, ISetDecoderProperties
         this.rangeDecoder.ReleaseStream();
     }
 
-    /// <inheritdoc/>
-    public void SetDecoderProperties(byte[] properties)
-    {
-        if (properties.Length < 5)
-        {
-            throw new ArgumentOutOfRangeException(nameof(properties));
-        }
-
-        var lc = properties[0] % 9;
-        var remainder = properties[0] / 9;
-        var lp = remainder % 5;
-        var pb = remainder / 5;
-        if (pb > LzmaBase.NumPosStatesBitsMax)
-        {
-            throw new InvalidDataException();
-        }
-
-        var currentDictionarySize = 0U;
-        for (var i = 0; i < 4; i++)
-        {
-            currentDictionarySize += ((uint)properties[1 + i]) << (i * 8);
-        }
-
-        this.SetDictionarySize(currentDictionarySize);
-        this.SetLiteralProperties(lp, lc);
-        this.SetPosBitsProperties(pb);
-    }
-
     /// <summary>
     /// Trains this instance with the stream.
     /// </summary>
@@ -219,45 +265,6 @@ internal class LzmaDecoder : ICoder, ISetDecoderProperties
     {
         this.solid = true;
         return this.outWindow.Train(stream);
-    }
-
-    private void SetDictionarySize(uint dictionarySize)
-    {
-        if (this.dictionarySize != dictionarySize)
-        {
-            this.dictionarySize = dictionarySize;
-            this.dictionarySizeCheck = Math.Max(this.dictionarySize, 1);
-            var blockSize = Math.Max(this.dictionarySizeCheck, 1 << 12);
-            this.outWindow.Create(blockSize);
-        }
-    }
-
-    private void SetLiteralProperties(int lp, int lc)
-    {
-        if (lp > 8)
-        {
-            throw new ArgumentOutOfRangeException(nameof(lp));
-        }
-
-        if (lc > 8)
-        {
-            throw new ArgumentOutOfRangeException(nameof(lc));
-        }
-
-        this.literalDecoder.Create(lp, lc);
-    }
-
-    private void SetPosBitsProperties(int pb)
-    {
-        if (pb > LzmaBase.NumPosStatesBitsMax)
-        {
-            throw new InvalidDataException();
-        }
-
-        var numPosStates = 1U << pb;
-        this.lenDecoder.Create(numPosStates);
-        this.repLenDecoder.Create(numPosStates);
-        this.posStateMask = numPosStates - 1;
     }
 
     private void Init(Stream inStream, Stream outStream)
@@ -393,12 +400,12 @@ internal class LzmaDecoder : ICoder, ISetDecoderProperties
         }
 
         public byte DecodeNormal(RangeCoder.Decoder rangeDecoder, uint pos, byte prevByte) => this.coders is not null
-                ? this.coders[this.GetState(pos, prevByte)].DecodeNormal(rangeDecoder)
-                : throw new InvalidOperationException();
+            ? this.coders[this.GetState(pos, prevByte)].DecodeNormal(rangeDecoder)
+            : throw new InvalidOperationException();
 
         public byte DecodeWithMatchByte(RangeCoder.Decoder rangeDecoder, uint pos, byte prevByte, byte matchByte) => this.coders is not null
-                ? this.coders[this.GetState(pos, prevByte)].DecodeWithMatchByte(rangeDecoder, matchByte)
-                : throw new InvalidOperationException();
+            ? this.coders[this.GetState(pos, prevByte)].DecodeWithMatchByte(rangeDecoder, matchByte)
+            : throw new InvalidOperationException();
 
         private uint GetState(uint pos, byte prevByte) => ((pos & this.posMask) << this.numPrevBits) + (uint)(prevByte >> (8 - this.numPrevBits));
 

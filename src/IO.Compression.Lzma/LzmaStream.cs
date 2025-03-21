@@ -45,8 +45,7 @@ public sealed class LzmaStream : Stream
         {
             var properties = new byte[5];
             _ = this.stream.Read(properties, 0, 5);
-            this.decoder = new();
-            this.decoder.SetDecoderProperties(properties);
+            this.decoder = new(properties);
 
             this.outputSize = 0L;
             for (var i = 0; i < 8; i++)
@@ -125,7 +124,7 @@ public sealed class LzmaStream : Stream
         if (this.decoder is not null)
         {
             var compressedSize = this.stream.Length - this.stream.Position;
-            this.decoder.Code(this.stream, destination, compressedSize, this.outputSize);
+            this.decoder.Decode(this.stream, destination, this.outputSize);
         }
     }
 #endif
@@ -145,7 +144,7 @@ public sealed class LzmaStream : Stream
                     destination.WriteByte((byte)(fileSize >> (8 * i)));
                 }
 
-                this.encoder.Code(this.stream, destination);
+                this.encoder.Encode(this.stream, destination);
             }
         },
         cancellationToken);

@@ -40,16 +40,11 @@ internal static class Benchmark
 
         Console.Write("\n       Compressing                Decompressing\n\n");
 
-        LzmaEncoder encoder = new();
-        LzmaDecoder decoder = new();
-
-        CoderPropId[] propIDs = [CoderPropId.DictionarySize];
-        object[] properties = [(int)dictionarySize];
+        LzmaEncoder encoder = new(new Dictionary<CoderPropId, object> { { CoderPropId.DictionarySize, (int)dictionarySize } });
 
         var bufferSize = dictionarySize + AdditionalSize;
         var compressedBufferSize = (bufferSize / 2) + CompressedAdditionalSize;
 
-        encoder.SetCoderProperties(propIDs, properties);
         var propStream = new MemoryStream();
         encoder.WriteCoderProperties(propStream);
         var propArray = propStream.ToArray();
@@ -79,7 +74,7 @@ internal static class Benchmark
             progressInfo.Init();
             _ = inStream.Seek(0, SeekOrigin.Begin);
             _ = compressedStream.Seek(0, SeekOrigin.Begin);
-            encoder.Code(inStream, compressedStream, -1, -1, (inSize, _) => progressInfo.SetProgress(inSize));
+            encoder.Encode(inStream, compressedStream, (inSize, _) => progressInfo.SetProgress(inSize));
             var sp2 = DateTime.UtcNow - progressInfo.Time;
             var encodeTime = (ulong)sp2.Ticks;
 
@@ -95,10 +90,10 @@ internal static class Benchmark
                 _ = compressedStream.Seek(0, SeekOrigin.Begin);
                 crcOutStream.Init();
 
-                decoder.SetDecoderProperties(propArray);
+                var decoder = new LzmaDecoder(propArray);
                 ulong outSize = bufferSize;
                 var startTime = DateTime.UtcNow;
-                decoder.Code(compressedStream, crcOutStream, 0, (long)outSize, progress: null);
+                decoder.Decode(compressedStream, crcOutStream, (long)outSize);
                 var sp = DateTime.UtcNow - startTime;
                 decodeTime = (ulong)sp.Ticks;
                 if (crcOutStream.Digest != crc.Digest)

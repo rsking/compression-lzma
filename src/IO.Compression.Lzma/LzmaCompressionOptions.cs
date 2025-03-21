@@ -60,33 +60,18 @@ public sealed class LzmaCompressionOptions
     /// <returns>The created encoder.</returns>
     internal LzmaEncoder CreateEncoder()
     {
-        CoderPropId[] propIDs =
-            [
-                CoderPropId.DictionarySize,
-                CoderPropId.PosStateBits,
-                CoderPropId.LitContextBits,
-                CoderPropId.LitPosBits,
-                CoderPropId.Algorithm,
-                CoderPropId.NumFastBytes,
-                CoderPropId.MatchFinder,
-                CoderPropId.EndMarker,
-            ];
+        var properties = new Dictionary<CoderPropId, object>
+        {
+            { CoderPropId.DictionarySize, 1 << this.Dictionary },
+            { CoderPropId.PosStateBits, this.PosBits },
+            { CoderPropId.LitContextBits, this.LiteralContextBits },
+            { CoderPropId.LitPosBits, this.LiteralPosBits },
+            { CoderPropId.Algorithm, DefaultAlgorithm },
+            { CoderPropId.NumFastBytes, this.FastBytes },
+            { CoderPropId.MatchFinder, this.MatchFinder.ToString() },
+            { CoderPropId.EndMarker, this.EndMarker },
+        };
 
-        object[] properties =
-        [
-                1 << this.Dictionary,
-                this.PosBits,
-                this.LiteralContextBits,
-                this.LiteralPosBits,
-                DefaultAlgorithm,
-                this.FastBytes,
-                this.MatchFinder.ToString(),
-                this.EndMarker,
-            ];
-
-        var encoder = new LzmaEncoder();
-        encoder.SetCoderProperties(propIDs, properties);
-
-        return encoder;
+        return new LzmaEncoder(properties);
     }
 }

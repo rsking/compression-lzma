@@ -20,33 +20,20 @@ public class LzmaEncoderTests
         var mf = "bt4";
         var eos = false;
 
-        CoderPropId[] propIDs =
-            [
-                CoderPropId.DictionarySize,
-                CoderPropId.PosStateBits,
-                CoderPropId.LitContextBits,
-                CoderPropId.LitPosBits,
-                CoderPropId.Algorithm,
-                CoderPropId.NumFastBytes,
-                CoderPropId.MatchFinder,
-                CoderPropId.EndMarker
-            ];
-
-        object[] properties =
-            [
-                dictionary,
-                posStateBits,
-                litContextBits,
-                litPosBits,
-                algorithm,
-                numFastBytes,
-                mf,
-                eos,
-            ];
+        var properties = new Dictionary<CoderPropId, object>
+        {
+            { CoderPropId.DictionarySize, dictionary },
+            { CoderPropId.PosStateBits, posStateBits },
+            { CoderPropId.LitContextBits, litContextBits },
+            { CoderPropId.LitPosBits, litPosBits },
+            { CoderPropId.Algorithm, algorithm },
+            { CoderPropId.NumFastBytes, numFastBytes },
+            { CoderPropId.MatchFinder, mf },
+            { CoderPropId.EndMarker, eos },
+        };
 
 
-        var encoder = new LzmaEncoder();
-        encoder.SetCoderProperties(propIDs, properties);
+        var encoder = new LzmaEncoder(properties);
 
         using var outStream = new MemoryStream();
         encoder.WriteCoderProperties(outStream);
@@ -62,7 +49,7 @@ public class LzmaEncoderTests
                 outStream.WriteByte((byte)(fileSize >> (8 * i)));
             }
 
-            encoder.Code(inStream, outStream);
+            encoder.Encode(inStream, outStream);
         }
 
         outStream.Position = 0;

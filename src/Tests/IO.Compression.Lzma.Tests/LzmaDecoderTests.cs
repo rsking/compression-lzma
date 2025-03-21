@@ -18,8 +18,7 @@ public class LzmaDecoderTests
         var properties = new byte[5];
         _ = lzma.Read(properties, 0, 5);
 
-        var decoder = new LzmaDecoder();
-        decoder.SetDecoderProperties(properties);
+        var decoder = new LzmaDecoder(properties);
 
         var outSize = 0L;
         for (var i = 0; i < 8; i++)
@@ -39,7 +38,7 @@ public class LzmaDecoderTests
         var compressedSize = lzma.Length - lzma.Position;
 
         using var output = new MemoryStream();
-        decoder.Code(lzma, output, compressedSize, outSize, null);
+        decoder.Decode(lzma, output, outSize);
 
         output.Position = 0;
         Assert.NotEqual(0L, output.Length);
