@@ -1,5 +1,5 @@
 ﻿// -----------------------------------------------------------------------
-// <copyright file="LzmaBase.cs" company="KingR">
+// <copyright file="Constants.cs" company="KingR">
 // Copyright (c) KingR. All rights reserved.
 // </copyright>
 // -----------------------------------------------------------------------
@@ -7,9 +7,9 @@
 namespace System.IO.Compression;
 
 /// <summary>
-/// The <c>LZMA</c> base class.
+/// The constants class.
 /// </summary>
-internal abstract class LzmaBase
+internal static class Constants
 {
     /// <summary>
     /// The number of registered distances.
@@ -142,69 +142,15 @@ internal abstract class LzmaBase
     public const uint MatchMaxLen = MatchMinLen + NumLenSymbols - 1;
 
     /// <summary>
-    /// GEts the length to position state.
+    /// Gets the length to position state.
     /// </summary>
     /// <param name="len">The length.</param>
     /// <returns>The distance to the position state.</returns>
     public static uint GetLenToPosState(uint len)
     {
         len -= MatchMinLen;
-        return len < NumLenToPosStates ? len : NumLenToPosStates - 1;
-    }
-
-    /// <summary>
-    /// The state structure.
-    /// </summary>
-    public struct State
-    {
-        /// <summary>
-        /// The index.
-        /// </summary>
-        public uint Index;
-
-        /// <summary>
-        /// Initializes the structure.
-        /// </summary>
-        public void Init() => this.Index = 0;
-
-        /// <summary>
-        /// Updates the character.
-        /// </summary>
-        public void UpdateChar()
-        {
-            if (this.Index < 4)
-            {
-                this.Index = 0;
-            }
-            else if (this.Index < 10)
-            {
-                this.Index -= 3;
-            }
-            else
-            {
-                this.Index -= 6;
-            }
-        }
-
-        /// <summary>
-        /// Updates the match.
-        /// </summary>
-        public void UpdateMatch() => this.Index = this.Index < 7 ? 7U : 10U;
-
-        /// <summary>
-        /// Updates the rep.
-        /// </summary>
-        public void UpdateRep() => this.Index = this.Index < 7 ? 8U : 11U;
-
-        /// <summary>
-        /// Updates the short rep.
-        /// </summary>
-        public void UpdateShortRep() => this.Index = this.Index < 7 ? 9U : 11U;
-
-        /// <summary>
-        /// Gets a value indicating whether this instace is a char.
-        /// </summary>
-        /// <returns><see langword="true"/> if this is a char; otherwise <see langword="false"/>.</returns>
-        public readonly bool IsCharState() => this.Index < 7U;
+        return len < NumLenToPosStates
+            ? len
+            : NumLenToPosStates - 1;
     }
 }

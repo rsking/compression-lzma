@@ -6,6 +6,8 @@
 
 namespace System.IO.Compression;
 
+using static System.IO.Compression.Constants;
+
 /// <summary>
 /// The LZMA encoder.
 /// </summary>
@@ -16,7 +18,7 @@ public class LzmaEncoder
     private const uint NumFastBytesDefault = 0x20U;
     private const uint NumOpts = 1U << 12;
 
-    private static readonly byte[] FastPos = new byte[1 << 11];
+    private static readonly byte[] FastPos = CreateFastPos();
 
     private static readonly string[] MatchFinderIDs =
     [
@@ -24,41 +26,41 @@ public class LzmaEncoder
         "BT4",
     ];
 
-    private readonly uint[] repDistances = new uint[LzmaBase.NumRepDistances];
+    private readonly uint[] repDistances = new uint[NumRepDistances];
 
     private readonly Optimal[] optimum = new Optimal[NumOpts];
     private readonly RangeCoder.Encoder rangeEncoder = new();
 
-    private readonly RangeCoder.BitEncoder[] isMatch = new RangeCoder.BitEncoder[LzmaBase.NumStates << LzmaBase.NumPosStatesBitsMax];
-    private readonly RangeCoder.BitEncoder[] isRep = new RangeCoder.BitEncoder[LzmaBase.NumStates];
-    private readonly RangeCoder.BitEncoder[] isRepG0 = new RangeCoder.BitEncoder[LzmaBase.NumStates];
-    private readonly RangeCoder.BitEncoder[] isRepG1 = new RangeCoder.BitEncoder[LzmaBase.NumStates];
-    private readonly RangeCoder.BitEncoder[] isRepG2 = new RangeCoder.BitEncoder[LzmaBase.NumStates];
-    private readonly RangeCoder.BitEncoder[] isRep0Long = new RangeCoder.BitEncoder[LzmaBase.NumStates << LzmaBase.NumPosStatesBitsMax];
+    private readonly RangeCoder.BitEncoder[] matchEncoders = new RangeCoder.BitEncoder[NumStates << NumPosStatesBitsMax];
+    private readonly RangeCoder.BitEncoder[] repEncoders = new RangeCoder.BitEncoder[NumStates];
+    private readonly RangeCoder.BitEncoder[] repG0Encoders = new RangeCoder.BitEncoder[NumStates];
+    private readonly RangeCoder.BitEncoder[] repG1Encoders = new RangeCoder.BitEncoder[NumStates];
+    private readonly RangeCoder.BitEncoder[] repG2Encoders = new RangeCoder.BitEncoder[NumStates];
+    private readonly RangeCoder.BitEncoder[] rep0LongEncoders = new RangeCoder.BitEncoder[NumStates << NumPosStatesBitsMax];
 
-    private readonly RangeCoder.BitTreeEncoder[] posSlotEncoder = new RangeCoder.BitTreeEncoder[LzmaBase.NumLenToPosStates];
+    private readonly RangeCoder.BitTreeEncoder[] posSlotEncoder = new RangeCoder.BitTreeEncoder[NumLenToPosStates];
 
-    private readonly RangeCoder.BitEncoder[] posEncoders = new RangeCoder.BitEncoder[LzmaBase.NumFullDistances - LzmaBase.EndPosModelIndex];
+    private readonly RangeCoder.BitEncoder[] posEncoders = new RangeCoder.BitEncoder[NumFullDistances - EndPosModelIndex];
     private readonly LenPriceTableEncoder lenEncoder = new();
     private readonly LenPriceTableEncoder repMatchLenEncoder = new();
 
     private readonly LiteralEncoder literalEncoder = new();
 
-    private readonly uint[] matchDistances = new uint[(LzmaBase.MatchMaxLen * 2) + 2];
+    private readonly uint[] matchDistances = new uint[(MatchMaxLen * 2) + 2];
 
-    private readonly RangeCoder.BitTreeEncoder posAlignEncoder = new(LzmaBase.NumAlignBits);
+    private readonly RangeCoder.BitTreeEncoder posAlignEncoder = new(NumAlignBits);
 
-    private readonly uint[] posSlotPrices = new uint[1 << (LzmaBase.NumPosSlotBits + LzmaBase.NumLenToPosStatesBits)];
-    private readonly uint[] distancesPrices = new uint[LzmaBase.NumFullDistances << LzmaBase.NumLenToPosStatesBits];
-    private readonly uint[] alignPrices = new uint[LzmaBase.AlignTableSize];
+    private readonly uint[] posSlotPrices = new uint[1 << (NumPosSlotBits + NumLenToPosStatesBits)];
+    private readonly uint[] distancesPrices = new uint[NumFullDistances << NumLenToPosStatesBits];
+    private readonly uint[] alignPrices = new uint[AlignTableSize];
 
-    private readonly uint[] reps = new uint[LzmaBase.NumRepDistances];
-    private readonly uint[] repLens = new uint[LzmaBase.NumRepDistances];
+    private readonly uint[] reps = new uint[NumRepDistances];
+    private readonly uint[] repLens = new uint[NumRepDistances];
 
-    private readonly uint[] tempPrices = new uint[LzmaBase.NumFullDistances];
+    private readonly uint[] tempPrices = new uint[NumFullDistances];
     private uint matchPriceCount;
 
-    private LzmaBase.State state = default;
+    private State state = default;
     private byte previousByte;
 
     private LZ.IMatchFinder? matchFinder;
@@ -89,7 +91,7 @@ public class LzmaEncoder
 
     private long nowPos64;
     private bool finished;
-    private Stream? inStream;
+    private Stream? inputStream;
 
     private EMatchFinderType matchFinderType = EMatchFinderType.BT4;
     private bool writeEndMark;
@@ -98,20 +100,24 @@ public class LzmaEncoder
 
     private uint trainSize;
 
-    static LzmaEncoder()
+    private static byte[] CreateFastPos()
     {
+        const byte Start = 2;
         const byte FastSlots = 22;
         var c = 2;
-        FastPos[0] = 0;
-        FastPos[1] = 1;
-        for (byte slotFast = 2; slotFast < FastSlots; slotFast++)
+        var fastPos = new byte[1 << 11];
+        fastPos[0] = 0;
+        fastPos[1] = 1;
+        for (var slotFast = Start; slotFast < FastSlots; slotFast++)
         {
             var k = 1U << ((slotFast >> 1) - 1);
             for (var j = 0U; j < k; j++, c++)
             {
-                FastPos[c] = slotFast;
+                fastPos[c] = slotFast;
             }
         }
+
+        return fastPos;
     }
 
     /// <summary>
@@ -125,9 +131,9 @@ public class LzmaEncoder
             this.optimum[i] = new Optimal();
         }
 
-        for (var i = 0; i < LzmaBase.NumLenToPosStates; i++)
+        for (var i = 0; i < NumLenToPosStates; i++)
         {
-            this.posSlotEncoder[i] = new RangeCoder.BitTreeEncoder(LzmaBase.NumPosSlotBits);
+            this.posSlotEncoder[i] = new RangeCoder.BitTreeEncoder(NumPosSlotBits);
         }
 
         SetCoderProperties(properties);
@@ -146,7 +152,7 @@ public class LzmaEncoder
                         }
 
                         var propertyNumFastBytes = (int)prop;
-                        if (propertyNumFastBytes is < 5 or > (int)LzmaBase.MatchMaxLen)
+                        if (propertyNumFastBytes is < 5 or > (int)MatchMaxLen)
                         {
                             throw new InvalidDataException();
                         }
@@ -185,7 +191,7 @@ public class LzmaEncoder
                             throw new InvalidDataException();
                         }
 
-                        if (dictionarySizeProp is < (int)(1U << LzmaBase.DicLogSizeMin) or
+                        if (dictionarySizeProp is < (int)(1U << DicLogSizeMin) or
                             > (int)(1U << DicLogSizeMaxCompress))
                         {
                             throw new InvalidDataException();
@@ -210,7 +216,7 @@ public class LzmaEncoder
                             throw new InvalidDataException();
                         }
 
-                        if (posStateBitsProp is < 0 or > (int)(uint)LzmaBase.NumPosStatesBitsEncodingMax)
+                        if (posStateBitsProp is < 0 or > (int)(uint)NumPosStatesBitsEncodingMax)
                         {
                             throw new InvalidDataException();
                         }
@@ -225,7 +231,7 @@ public class LzmaEncoder
                             throw new InvalidDataException();
                         }
 
-                        if (numLiteralPosStateBitsProp is < 0 or > (int)LzmaBase.NumLitPosStatesBitsEncodingMax)
+                        if (numLiteralPosStateBitsProp is < 0 or > (int)NumLitPosStatesBitsEncodingMax)
                         {
                             throw new InvalidDataException();
                         }
@@ -239,7 +245,7 @@ public class LzmaEncoder
                             throw new InvalidDataException();
                         }
 
-                        if (numLiteralContextBitsProp is < 0 or > (int)LzmaBase.NumLitContextBitsMax)
+                        if (numLiteralContextBitsProp is < 0 or > (int)NumLitContextBitsMax)
                         {
                             throw new InvalidDataException();
                         }
@@ -296,13 +302,13 @@ public class LzmaEncoder
             SetStreams(input, output);
             while (true)
             {
-                this.CodeOneBlock(out var processedInSize, out var processedOutSize, out var isFinished);
+                this.CodeOneBlock(out var processedInputSize, out var processedOutputSize, out var isFinished);
                 if (isFinished)
                 {
                     return;
                 }
 
-                progress?.Invoke(processedInSize, processedOutSize);
+                progress?.Invoke(processedInputSize, processedOutputSize);
             }
         }
         finally
@@ -311,20 +317,20 @@ public class LzmaEncoder
             this.rangeEncoder.ReleaseStream();
         }
 
-        void SetStreams(Stream inStream, Stream outStream)
+        void SetStreams(Stream inputStream, Stream outputStream)
         {
-            this.inStream = inStream;
+            this.inputStream = inputStream;
             this.finished = false;
             this.Create();
-            this.rangeEncoder.SetStream(outStream);
+            this.rangeEncoder.SetStream(outputStream);
             this.Init();
 
             this.FillDistancesPrices();
             this.FillAlignPrices();
 
-            this.lenEncoder.SetTableSize(this.numFastBytes + 1 - LzmaBase.MatchMinLen);
+            this.lenEncoder.SetTableSize(this.numFastBytes + 1 - MatchMinLen);
             this.lenEncoder.UpdateTables(1U << this.posStateBits);
-            this.repMatchLenEncoder.SetTableSize(this.numFastBytes + 1 - LzmaBase.MatchMinLen);
+            this.repMatchLenEncoder.SetTableSize(this.numFastBytes + 1 - MatchMinLen);
             this.repMatchLenEncoder.UpdateTables(1U << this.posStateBits);
 
             this.nowPos64 = 0;
@@ -348,12 +354,12 @@ public class LzmaEncoder
         outSize = default;
         finished = true;
 
-        if (this.inStream is not null)
+        if (this.inputStream is not null)
         {
-            this.matchFinder.SetStream(this.inStream);
+            this.matchFinder.SetStream(this.inputStream);
             this.matchFinder.Init();
             this.needReleaseMFStream = true;
-            this.inStream = null;
+            this.inputStream = null;
             if (this.trainSize > 0)
             {
                 this.matchFinder.Skip(this.trainSize);
@@ -378,7 +384,7 @@ public class LzmaEncoder
 
             this.ReadMatchDistances(out _, out _);
             var posState = (uint)this.nowPos64 & this.posStateMask;
-            this.isMatch[(this.state.Index << LzmaBase.NumPosStatesBitsMax) + posState].Encode(this.rangeEncoder, 0);
+            this.matchEncoders[(this.state.Index << NumPosStatesBitsMax) + posState].Encode(this.rangeEncoder, 0);
             this.state.UpdateChar();
             var curByte = this.matchFinder.GetIndexByte((int)(0 - this.additionalOffset));
             this.literalEncoder.GetSubCoder((uint)this.nowPos64, this.previousByte).Encode(this.rangeEncoder, curByte);
@@ -398,10 +404,10 @@ public class LzmaEncoder
             var len = this.GetOptimum((uint)this.nowPos64, out var pos);
 
             var posState = ((uint)this.nowPos64) & this.posStateMask;
-            var complexState = (this.state.Index << LzmaBase.NumPosStatesBitsMax) + posState;
+            var complexState = (this.state.Index << NumPosStatesBitsMax) + posState;
             if (len is 1 && pos is uint.MaxValue)
             {
-                this.isMatch[complexState].Encode(this.rangeEncoder, 0);
+                this.matchEncoders[complexState].Encode(this.rangeEncoder, 0);
                 var curByte = this.matchFinder.GetIndexByte((int)(0 - this.additionalOffset));
                 var subCoder = this.literalEncoder.GetSubCoder((uint)this.nowPos64, this.previousByte);
                 if (!this.state.IsCharState())
@@ -419,33 +425,33 @@ public class LzmaEncoder
             }
             else
             {
-                this.isMatch[complexState].Encode(this.rangeEncoder, 1);
-                if (pos < LzmaBase.NumRepDistances)
+                this.matchEncoders[complexState].Encode(this.rangeEncoder, 1);
+                if (pos < NumRepDistances)
                 {
-                    this.isRep[this.state.Index].Encode(this.rangeEncoder, 1);
+                    this.repEncoders[this.state.Index].Encode(this.rangeEncoder, 1);
                     if (pos is 0U)
                     {
-                        this.isRepG0[this.state.Index].Encode(this.rangeEncoder, 0);
+                        this.repG0Encoders[this.state.Index].Encode(this.rangeEncoder, 0);
                         if (len is 1U)
                         {
-                            this.isRep0Long[complexState].Encode(this.rangeEncoder, 0);
+                            this.rep0LongEncoders[complexState].Encode(this.rangeEncoder, 0);
                         }
                         else
                         {
-                            this.isRep0Long[complexState].Encode(this.rangeEncoder, 1);
+                            this.rep0LongEncoders[complexState].Encode(this.rangeEncoder, 1);
                         }
                     }
                     else
                     {
-                        this.isRepG0[this.state.Index].Encode(this.rangeEncoder, 1);
+                        this.repG0Encoders[this.state.Index].Encode(this.rangeEncoder, 1);
                         if (pos is 1U)
                         {
-                            this.isRepG1[this.state.Index].Encode(this.rangeEncoder, 0);
+                            this.repG1Encoders[this.state.Index].Encode(this.rangeEncoder, 0);
                         }
                         else
                         {
-                            this.isRepG1[this.state.Index].Encode(this.rangeEncoder, 1);
-                            this.isRepG2[this.state.Index].Encode(this.rangeEncoder, pos - 2);
+                            this.repG1Encoders[this.state.Index].Encode(this.rangeEncoder, 1);
+                            this.repG2Encoders[this.state.Index].Encode(this.rangeEncoder, pos - 2);
                         }
                     }
 
@@ -455,7 +461,7 @@ public class LzmaEncoder
                     }
                     else
                     {
-                        this.repMatchLenEncoder.Encode(this.rangeEncoder, len - LzmaBase.MatchMinLen, posState);
+                        this.repMatchLenEncoder.Encode(this.rangeEncoder, len - MatchMinLen, posState);
                         this.state.UpdateRep();
                     }
 
@@ -472,21 +478,21 @@ public class LzmaEncoder
                 }
                 else
                 {
-                    this.isRep[this.state.Index].Encode(this.rangeEncoder, 0);
+                    this.repEncoders[this.state.Index].Encode(this.rangeEncoder, 0);
                     this.state.UpdateMatch();
-                    this.lenEncoder.Encode(this.rangeEncoder, len - LzmaBase.MatchMinLen, posState);
-                    pos -= LzmaBase.NumRepDistances;
+                    this.lenEncoder.Encode(this.rangeEncoder, len - MatchMinLen, posState);
+                    pos -= NumRepDistances;
                     var posSlot = GetPosSlot(pos);
-                    var lenToPosState = LzmaBase.GetLenToPosState(len);
+                    var lenToPosState = GetLenToPosState(len);
                     this.posSlotEncoder[lenToPosState].Encode(this.rangeEncoder, posSlot);
 
-                    if (posSlot >= LzmaBase.StartPosModelIndex)
+                    if (posSlot >= StartPosModelIndex)
                     {
                         var footerBits = (int)((posSlot >> 1) - 1);
                         var baseVal = (2 | (posSlot & 1)) << footerBits;
                         var posReduced = pos - baseVal;
 
-                        if (posSlot < LzmaBase.EndPosModelIndex)
+                        if (posSlot < EndPosModelIndex)
                         {
                             RangeCoder.BitTreeEncoder.ReverseEncode(
                                 this.posEncoders,
@@ -497,14 +503,14 @@ public class LzmaEncoder
                         }
                         else
                         {
-                            this.rangeEncoder.EncodeDirectBits(posReduced >> LzmaBase.NumAlignBits, footerBits - LzmaBase.NumAlignBits);
-                            this.posAlignEncoder.ReverseEncode(this.rangeEncoder, posReduced & LzmaBase.AlignMask);
+                            this.rangeEncoder.EncodeDirectBits(posReduced >> NumAlignBits, footerBits - NumAlignBits);
+                            this.posAlignEncoder.ReverseEncode(this.rangeEncoder, posReduced & AlignMask);
                             this.alignPriceCount++;
                         }
                     }
 
                     var distance = pos;
-                    for (var i = LzmaBase.NumRepDistances - 1; i >= 1; i--)
+                    for (var i = NumRepDistances - 1; i >= 1; i--)
                     {
                         this.repDistances[i] = this.repDistances[i - 1];
                     }
@@ -526,7 +532,7 @@ public class LzmaEncoder
                     this.FillDistancesPrices();
                 }
 
-                if (this.alignPriceCount >= LzmaBase.AlignTableSize)
+                if (this.alignPriceCount >= AlignTableSize)
                 {
                     this.FillAlignPrices();
                 }
@@ -582,9 +588,8 @@ public class LzmaEncoder
 
     private void BaseInit()
     {
-        this.state.Init();
         this.previousByte = 0;
-        for (var i = 0U; i < LzmaBase.NumRepDistances; i++)
+        for (var i = 0U; i < NumRepDistances; i++)
         {
             this.repDistances[i] = 0;
         }
@@ -610,7 +615,7 @@ public class LzmaEncoder
             return;
         }
 
-        this.matchFinder.Create(this.dictionarySize, NumOpts, this.numFastBytes, LzmaBase.MatchMaxLen + 1);
+        this.matchFinder.Create(this.dictionarySize, NumOpts, this.numFastBytes, MatchMaxLen + 1);
         this.dictionarySizePrev = this.dictionarySize;
         this.numFastBytesPrev = this.numFastBytes;
     }
@@ -622,28 +627,28 @@ public class LzmaEncoder
         this.BaseInit();
         this.rangeEncoder.Init();
 
-        for (var i = 0U; i < LzmaBase.NumStates; i++)
+        for (var i = 0U; i < NumStates; i++)
         {
             for (var j = 0U; j <= this.posStateMask; j++)
             {
-                var complexState = (i << LzmaBase.NumPosStatesBitsMax) + j;
-                this.isMatch[complexState].Init();
-                this.isRep0Long[complexState].Init();
+                var complexState = (i << NumPosStatesBitsMax) + j;
+                this.matchEncoders[complexState].Init();
+                this.rep0LongEncoders[complexState].Init();
             }
 
-            this.isRep[i].Init();
-            this.isRepG0[i].Init();
-            this.isRepG1[i].Init();
-            this.isRepG2[i].Init();
+            this.repEncoders[i].Init();
+            this.repG0Encoders[i].Init();
+            this.repG1Encoders[i].Init();
+            this.repG2Encoders[i].Init();
         }
 
         this.literalEncoder.Init();
-        for (var i = 0U; i < LzmaBase.NumLenToPosStates; i++)
+        for (var i = 0U; i < NumLenToPosStates; i++)
         {
             this.posSlotEncoder[i].Init();
         }
 
-        for (var i = 0U; i < LzmaBase.NumFullDistances - LzmaBase.EndPosModelIndex; i++)
+        for (var i = 0U; i < NumFullDistances - EndPosModelIndex; i++)
         {
             this.posEncoders[i].Init();
         }
@@ -676,7 +681,7 @@ public class LzmaEncoder
                 lenRes += this.matchFinder.GetMatchLen(
                     (int)lenRes - 1,
                     this.matchDistances[numDistancePairs - 1],
-                    LzmaBase.MatchMaxLen - lenRes);
+                    MatchMaxLen - lenRes);
             }
         }
 
@@ -692,48 +697,48 @@ public class LzmaEncoder
         }
     }
 
-    private uint GetRepLen1Price(LzmaBase.State state, uint posState) => this.isRepG0[state.Index].GetPrice0() + this.isRep0Long[(state.Index << LzmaBase.NumPosStatesBitsMax) + posState].GetPrice0();
+    private uint GetRepLen1Price(State state, uint posState) => this.repG0Encoders[state.Index].GetPrice0() + this.rep0LongEncoders[(state.Index << NumPosStatesBitsMax) + posState].GetPrice0();
 
-    private uint GetPureRepPrice(uint repIndex, LzmaBase.State state, uint posState)
+    private uint GetPureRepPrice(uint repIndex, State state, uint posState)
     {
         uint price;
         if (repIndex is 0U)
         {
-            price = this.isRepG0[state.Index].GetPrice0();
-            price += this.isRep0Long[(state.Index << LzmaBase.NumPosStatesBitsMax) + posState].GetPrice1();
+            price = this.repG0Encoders[state.Index].GetPrice0();
+            price += this.rep0LongEncoders[(state.Index << NumPosStatesBitsMax) + posState].GetPrice1();
         }
         else
         {
-            price = this.isRepG0[state.Index].GetPrice1();
+            price = this.repG0Encoders[state.Index].GetPrice1();
             if (repIndex is 1U)
             {
-                price += this.isRepG1[state.Index].GetPrice0();
+                price += this.repG1Encoders[state.Index].GetPrice0();
             }
             else
             {
-                price += this.isRepG1[state.Index].GetPrice1();
-                price += this.isRepG2[state.Index].GetPrice(repIndex - 2);
+                price += this.repG1Encoders[state.Index].GetPrice1();
+                price += this.repG2Encoders[state.Index].GetPrice(repIndex - 2);
             }
         }
 
         return price;
     }
 
-    private uint GetRepPrice(uint repIndex, uint len, LzmaBase.State state, uint posState)
+    private uint GetRepPrice(uint repIndex, uint len, State state, uint posState)
     {
-        var price = this.repMatchLenEncoder.GetPrice(len - LzmaBase.MatchMinLen, posState);
+        var price = this.repMatchLenEncoder.GetPrice(len - MatchMinLen, posState);
         return price + this.GetPureRepPrice(repIndex, state, posState);
     }
 
     private uint GetPosLenPrice(uint pos, uint len, uint posState)
     {
         uint price;
-        var lenToPosState = LzmaBase.GetLenToPosState(len);
-        price = pos < LzmaBase.NumFullDistances
-            ? this.distancesPrices[(lenToPosState * LzmaBase.NumFullDistances) + pos]
-            : this.posSlotPrices[(lenToPosState << LzmaBase.NumPosSlotBits) + GetPosSlot2(pos)] + this.alignPrices[pos & LzmaBase.AlignMask];
+        var lenToPosState = GetLenToPosState(len);
+        price = pos < NumFullDistances
+            ? this.distancesPrices[(lenToPosState * NumFullDistances) + pos]
+            : this.posSlotPrices[(lenToPosState << NumPosSlotBits) + GetPosSlot2(pos)] + this.alignPrices[pos & AlignMask];
 
-        return price + this.lenEncoder.GetPrice(len - LzmaBase.MatchMinLen, posState);
+        return price + this.lenEncoder.GetPrice(len - MatchMinLen, posState);
 
         static uint GetPosSlot2(uint pos)
         {
@@ -819,10 +824,10 @@ public class LzmaEncoder
         }
 
         var repMaxIndex = 0U;
-        for (var i = 0U; i < LzmaBase.NumRepDistances; i++)
+        for (var i = 0U; i < NumRepDistances; i++)
         {
             this.reps[i] = this.repDistances[i];
-            this.repLens[i] = this.matchFinder.GetMatchLen(0 - 1, this.reps[i], LzmaBase.MatchMaxLen);
+            this.repLens[i] = this.matchFinder.GetMatchLen(0 - 1, this.reps[i], MatchMaxLen);
             if (this.repLens[i] > this.repLens[repMaxIndex])
             {
                 repMaxIndex = i;
@@ -839,7 +844,7 @@ public class LzmaEncoder
 
         if (lenMain >= this.numFastBytes)
         {
-            backRes = this.matchDistances[currentNumDistancePairs - 1] + LzmaBase.NumRepDistances;
+            backRes = this.matchDistances[currentNumDistancePairs - 1] + NumRepDistances;
             this.MovePos(lenMain - 1);
             return lenMain;
         }
@@ -857,13 +862,13 @@ public class LzmaEncoder
 
         var posState = position & this.posStateMask;
 
-        this.optimum[1].Price = this.isMatch[(this.state.Index << LzmaBase.NumPosStatesBitsMax)
+        this.optimum[1].Price = this.matchEncoders[(this.state.Index << NumPosStatesBitsMax)
             + posState].GetPrice0()
             + this.literalEncoder.GetSubCoder(position, this.previousByte).GetPrice(!this.state.IsCharState(), matchByte, currentByte);
         this.optimum[1].MakeAsChar();
 
-        var matchPrice = this.isMatch[(this.state.Index << LzmaBase.NumPosStatesBitsMax) + posState].GetPrice1();
-        var repMatchPrice = matchPrice + this.isRep[this.state.Index].GetPrice1();
+        var matchPrice = this.matchEncoders[(this.state.Index << NumPosStatesBitsMax) + posState].GetPrice1();
+        var repMatchPrice = matchPrice + this.repEncoders[this.state.Index].GetPrice1();
 
         if (matchByte == currentByte)
         {
@@ -897,7 +902,7 @@ public class LzmaEncoder
         }
         while (len >= 2);
 
-        for (var i = 0U; i < LzmaBase.NumRepDistances; i++)
+        for (var i = 0U; i < NumRepDistances; i++)
         {
             var repLen = this.repLens[i];
             if (repLen < 2)
@@ -921,7 +926,7 @@ public class LzmaEncoder
             while (--repLen >= 2);
         }
 
-        var normalMatchPrice = matchPrice + this.isRep[this.state.Index].GetPrice0();
+        var normalMatchPrice = matchPrice + this.repEncoders[this.state.Index].GetPrice0();
 
         len = (this.repLens[0] >= 2) ? this.repLens[0] + 1 : 2;
         if (len <= lenMain)
@@ -942,7 +947,7 @@ public class LzmaEncoder
                 {
                     currentOptimum.Price = curAndLenPrice;
                     currentOptimum.PosPrev = 0;
-                    currentOptimum.BackPrev = distance + LzmaBase.NumRepDistances;
+                    currentOptimum.BackPrev = distance + NumRepDistances;
                     currentOptimum.Prev1IsChar = false;
                 }
 
@@ -979,14 +984,14 @@ public class LzmaEncoder
 
             position++;
             var posPrev = this.optimum[cur].PosPrev;
-            LzmaBase.State optimumState;
+            State optimumState;
             if (this.optimum[cur].Prev1IsChar)
             {
                 posPrev--;
                 if (this.optimum[cur].Prev2)
                 {
                     optimumState = this.optimum[this.optimum[cur].PosPrev2].State;
-                    if (this.optimum[cur].BackPrev2 < LzmaBase.NumRepDistances)
+                    if (this.optimum[cur].BackPrev2 < NumRepDistances)
                     {
                         optimumState.UpdateRep();
                     }
@@ -1030,7 +1035,7 @@ public class LzmaEncoder
                 else
                 {
                     pos = this.optimum[cur].BackPrev;
-                    if (pos < LzmaBase.NumRepDistances)
+                    if (pos < NumRepDistances)
                     {
                         optimumState.UpdateRep();
                     }
@@ -1041,7 +1046,7 @@ public class LzmaEncoder
                 }
 
                 var opt = this.optimum[posPrev];
-                if (pos < LzmaBase.NumRepDistances)
+                if (pos < NumRepDistances)
                 {
                     if (pos is 0U)
                     {
@@ -1074,7 +1079,7 @@ public class LzmaEncoder
                 }
                 else
                 {
-                    this.reps[0] = pos - LzmaBase.NumRepDistances;
+                    this.reps[0] = pos - NumRepDistances;
                     this.reps[1] = opt.Backs0;
                     this.reps[2] = opt.Backs1;
                     this.reps[3] = opt.Backs2;
@@ -1094,7 +1099,7 @@ public class LzmaEncoder
             posState = position & this.posStateMask;
 
             var curAnd1Price = curPrice +
-                this.isMatch[(optimumState.Index << LzmaBase.NumPosStatesBitsMax) + posState].GetPrice0() +
+                this.matchEncoders[(optimumState.Index << NumPosStatesBitsMax) + posState].GetPrice0() +
                 this.literalEncoder.GetSubCoder(position, this.matchFinder.GetIndexByte(0 - 2)).
                 GetPrice(!optimumState.IsCharState(), matchByte, currentByte);
 
@@ -1109,8 +1114,8 @@ public class LzmaEncoder
                 nextIsChar = true;
             }
 
-            matchPrice = curPrice + this.isMatch[(optimumState.Index << LzmaBase.NumPosStatesBitsMax) + posState].GetPrice1();
-            repMatchPrice = matchPrice + this.isRep[optimumState.Index].GetPrice1();
+            matchPrice = curPrice + this.matchEncoders[(optimumState.Index << NumPosStatesBitsMax) + posState].GetPrice1();
+            repMatchPrice = matchPrice + this.repEncoders[optimumState.Index].GetPrice1();
 
             if (matchByte == currentByte &&
                 !(nextOptimum.PosPrev < cur && nextOptimum.BackPrev is 0U))
@@ -1150,8 +1155,8 @@ public class LzmaEncoder
                     state2.UpdateChar();
                     var posStateNext = (position + 1) & this.posStateMask;
                     var nextRepMatchPrice = curAnd1Price +
-                        this.isMatch[(state2.Index << LzmaBase.NumPosStatesBitsMax) + posStateNext].GetPrice1() +
-                        this.isRep[state2.Index].GetPrice1();
+                        this.matchEncoders[(state2.Index << NumPosStatesBitsMax) + posStateNext].GetPrice1() +
+                        this.repEncoders[state2.Index].GetPrice1();
 
                     var offset = cur + 1 + lenTest2;
                     while (lenEnd < offset)
@@ -1175,7 +1180,7 @@ public class LzmaEncoder
             // speed optimization
             var startLen = 2U;
 
-            for (var repIndex = 0U; repIndex < LzmaBase.NumRepDistances; repIndex++)
+            for (var repIndex = 0U; repIndex < NumRepDistances; repIndex++)
             {
                 var lenTest = this.matchFinder.GetMatchLen(0 - 1, this.reps[repIndex], numAvailableBytes);
                 if (lenTest < 2U)
@@ -1221,7 +1226,7 @@ public class LzmaEncoder
                         var posStateNext = (position + lenTest) & this.posStateMask;
                         var curAndLenCharPrice = repMatchPrice
                             + this.GetRepPrice(repIndex, lenTest, optimumState, posState)
-                            + this.isMatch[(state2.Index << LzmaBase.NumPosStatesBitsMax) + posStateNext].GetPrice0()
+                            + this.matchEncoders[(state2.Index << NumPosStatesBitsMax) + posStateNext].GetPrice0()
                             + this.literalEncoder.GetSubCoder(position + lenTest, this.matchFinder.GetIndexByte((int)lenTest - 1 - 1))
                                 .GetPrice(
                                     matchMode: true,
@@ -1229,8 +1234,8 @@ public class LzmaEncoder
                                     this.matchFinder.GetIndexByte((int)lenTest - 1));
                         state2.UpdateChar();
                         posStateNext = (position + lenTest + 1) & this.posStateMask;
-                        var nextMatchPrice = curAndLenCharPrice + this.isMatch[(state2.Index << LzmaBase.NumPosStatesBitsMax) + posStateNext].GetPrice1();
-                        var nextRepMatchPrice = nextMatchPrice + this.isRep[state2.Index].GetPrice1();
+                        var nextMatchPrice = curAndLenCharPrice + this.matchEncoders[(state2.Index << NumPosStatesBitsMax) + posStateNext].GetPrice1();
+                        var nextRepMatchPrice = nextMatchPrice + this.repEncoders[state2.Index].GetPrice1();
 
                         var offset = lenTest + 1 + lenTest2;
                         while (lenEnd < cur + offset)
@@ -1268,7 +1273,7 @@ public class LzmaEncoder
 
             if (newLen >= startLen)
             {
-                normalMatchPrice = matchPrice + this.isRep[optimumState.Index].GetPrice0();
+                normalMatchPrice = matchPrice + this.repEncoders[optimumState.Index].GetPrice0();
                 while (lenEnd < cur + newLen)
                 {
                     this.optimum[++lenEnd].Price = IfinityPrice;
@@ -1290,7 +1295,7 @@ public class LzmaEncoder
                     {
                         currentOptimum.Price = curAndLenPrice;
                         currentOptimum.PosPrev = cur;
-                        currentOptimum.BackPrev = curBack + LzmaBase.NumRepDistances;
+                        currentOptimum.BackPrev = curBack + NumRepDistances;
                         currentOptimum.Prev1IsChar = false;
                     }
 
@@ -1306,7 +1311,7 @@ public class LzmaEncoder
                                 state2.UpdateMatch();
                                 var posStateNext = (position + lenTest) & this.posStateMask;
                                 var curAndLenCharPrice = curAndLenPrice
-                                    + this.isMatch[(state2.Index << LzmaBase.NumPosStatesBitsMax)
+                                    + this.matchEncoders[(state2.Index << NumPosStatesBitsMax)
                                     + posStateNext].GetPrice0()
                                     + this.literalEncoder.GetSubCoder(position + lenTest, this.matchFinder.GetIndexByte((int)lenTest - 1 - 1))
                                         .GetPrice(
@@ -1315,8 +1320,8 @@ public class LzmaEncoder
                                             this.matchFinder.GetIndexByte((int)lenTest - 1));
                                 state2.UpdateChar();
                                 posStateNext = (position + lenTest + 1) & this.posStateMask;
-                                var nextMatchPrice = curAndLenCharPrice + this.isMatch[(state2.Index << LzmaBase.NumPosStatesBitsMax) + posStateNext].GetPrice1();
-                                var nextRepMatchPrice = nextMatchPrice + this.isRep[state2.Index].GetPrice1();
+                                var nextMatchPrice = curAndLenCharPrice + this.matchEncoders[(state2.Index << NumPosStatesBitsMax) + posStateNext].GetPrice1();
+                                var nextRepMatchPrice = nextMatchPrice + this.repEncoders[state2.Index].GetPrice1();
 
                                 var offset = lenTest + 1 + lenTest2;
                                 while (lenEnd < cur + offset)
@@ -1334,7 +1339,7 @@ public class LzmaEncoder
                                     currentOptimum.Prev1IsChar = true;
                                     currentOptimum.Prev2 = true;
                                     currentOptimum.PosPrev2 = cur;
-                                    currentOptimum.BackPrev2 = curBack + LzmaBase.NumRepDistances;
+                                    currentOptimum.BackPrev2 = curBack + NumRepDistances;
                                 }
                             }
                         }
@@ -1365,18 +1370,18 @@ public class LzmaEncoder
                 return;
             }
 
-            this.isMatch[(this.state.Index << LzmaBase.NumPosStatesBitsMax) + posState].Encode(this.rangeEncoder, 1);
-            this.isRep[this.state.Index].Encode(this.rangeEncoder, 0);
+            this.matchEncoders[(this.state.Index << NumPosStatesBitsMax) + posState].Encode(this.rangeEncoder, 1);
+            this.repEncoders[this.state.Index].Encode(this.rangeEncoder, 0);
             this.state.UpdateMatch();
-            const uint len = LzmaBase.MatchMinLen;
-            this.lenEncoder.Encode(this.rangeEncoder, len - LzmaBase.MatchMinLen, posState);
-            const uint posSlot = (1U << LzmaBase.NumPosSlotBits) - 1U;
-            var lenToPosState = LzmaBase.GetLenToPosState(len);
+            const uint len = MatchMinLen;
+            this.lenEncoder.Encode(this.rangeEncoder, len - MatchMinLen, posState);
+            const uint posSlot = (1U << NumPosSlotBits) - 1U;
+            var lenToPosState = GetLenToPosState(len);
             this.posSlotEncoder[lenToPosState].Encode(this.rangeEncoder, posSlot);
             const int footerBits = 30;
             const uint posReduced = (1U << footerBits) - 1U;
-            this.rangeEncoder.EncodeDirectBits(posReduced >> LzmaBase.NumAlignBits, footerBits - LzmaBase.NumAlignBits);
-            this.posAlignEncoder.ReverseEncode(this.rangeEncoder, posReduced & LzmaBase.AlignMask);
+            this.rangeEncoder.EncodeDirectBits(posReduced >> NumAlignBits, footerBits - NumAlignBits);
+            this.posAlignEncoder.ReverseEncode(this.rangeEncoder, posReduced & AlignMask);
         }
     }
 
@@ -1391,7 +1396,7 @@ public class LzmaEncoder
 
     private void FillDistancesPrices()
     {
-        for (var i = LzmaBase.StartPosModelIndex; i < LzmaBase.NumFullDistances; i++)
+        for (var i = StartPosModelIndex; i < NumFullDistances; i++)
         {
             var posSlot = GetPosSlot(i);
             var footerBits = (int)((posSlot >> 1) - 1);
@@ -1399,10 +1404,10 @@ public class LzmaEncoder
             this.tempPrices[i] = RangeCoder.BitTreeEncoder.ReverseGetPrice(this.posEncoders, baseVal - posSlot - 1, footerBits, i - baseVal);
         }
 
-        for (var lenToPosState = 0U; lenToPosState < LzmaBase.NumLenToPosStates; lenToPosState++)
+        for (var lenToPosState = 0U; lenToPosState < NumLenToPosStates; lenToPosState++)
         {
             var encoder = this.posSlotEncoder[lenToPosState];
-            var st = lenToPosState << LzmaBase.NumPosSlotBits;
+            var st = lenToPosState << NumPosSlotBits;
 
             uint posSlot;
             for (posSlot = 0; posSlot < this.distTableSize; posSlot++)
@@ -1410,19 +1415,19 @@ public class LzmaEncoder
                 this.posSlotPrices[st + posSlot] = encoder.GetPrice(posSlot);
             }
 
-            for (posSlot = LzmaBase.EndPosModelIndex; posSlot < this.distTableSize; posSlot++)
+            for (posSlot = EndPosModelIndex; posSlot < this.distTableSize; posSlot++)
             {
-                this.posSlotPrices[st + posSlot] += ((posSlot >> 1) - 1 - LzmaBase.NumAlignBits) << RangeCoder.BitEncoder.NumBitPriceShiftBits;
+                this.posSlotPrices[st + posSlot] += ((posSlot >> 1) - 1 - NumAlignBits) << RangeCoder.BitEncoder.NumBitPriceShiftBits;
             }
 
-            var st2 = lenToPosState * LzmaBase.NumFullDistances;
+            var st2 = lenToPosState * NumFullDistances;
             uint i;
-            for (i = 0U; i < LzmaBase.StartPosModelIndex; i++)
+            for (i = 0U; i < StartPosModelIndex; i++)
             {
                 this.distancesPrices[st2 + i] = this.posSlotPrices[st + i];
             }
 
-            for (; i < LzmaBase.NumFullDistances; i++)
+            for (; i < NumFullDistances; i++)
             {
                 this.distancesPrices[st2 + i] = this.posSlotPrices[st + GetPosSlot(i)] + this.tempPrices[i];
             }
@@ -1433,7 +1438,7 @@ public class LzmaEncoder
 
     private void FillAlignPrices()
     {
-        for (var i = 0U; i < LzmaBase.AlignTableSize; i++)
+        for (var i = 0U; i < AlignTableSize; i++)
         {
             this.alignPrices[i] = this.posAlignEncoder.ReverseGetPrice(i);
         }
@@ -1566,18 +1571,18 @@ public class LzmaEncoder
 
     private class LenEncoder
     {
-        private readonly RangeCoder.BitTreeEncoder[] lowCoder = new RangeCoder.BitTreeEncoder[LzmaBase.NumPosStatesEncodingMax];
-        private readonly RangeCoder.BitTreeEncoder[] midCoder = new RangeCoder.BitTreeEncoder[LzmaBase.NumPosStatesEncodingMax];
-        private readonly RangeCoder.BitTreeEncoder highCoder = new(LzmaBase.NumHighLenBits);
+        private readonly RangeCoder.BitTreeEncoder[] lowCoder = new RangeCoder.BitTreeEncoder[NumPosStatesEncodingMax];
+        private readonly RangeCoder.BitTreeEncoder[] midCoder = new RangeCoder.BitTreeEncoder[NumPosStatesEncodingMax];
+        private readonly RangeCoder.BitTreeEncoder highCoder = new(NumHighLenBits);
         private RangeCoder.BitEncoder firstChoice = default;
         private RangeCoder.BitEncoder secondChoice = default;
 
         public LenEncoder()
         {
-            for (var posState = 0U; posState < LzmaBase.NumPosStatesEncodingMax; posState++)
+            for (var posState = 0U; posState < NumPosStatesEncodingMax; posState++)
             {
-                this.lowCoder[posState] = new RangeCoder.BitTreeEncoder(LzmaBase.NumLowLenBits);
-                this.midCoder[posState] = new RangeCoder.BitTreeEncoder(LzmaBase.NumMidLenBits);
+                this.lowCoder[posState] = new RangeCoder.BitTreeEncoder(NumLowLenBits);
+                this.midCoder[posState] = new RangeCoder.BitTreeEncoder(NumMidLenBits);
             }
         }
 
@@ -1596,16 +1601,16 @@ public class LzmaEncoder
 
         public void Encode(RangeCoder.Encoder rangeEncoder, uint symbol, uint posState)
         {
-            if (symbol < LzmaBase.NumLowLenSymbols)
+            if (symbol < NumLowLenSymbols)
             {
                 this.firstChoice.Encode(rangeEncoder, 0);
                 this.lowCoder[posState].Encode(rangeEncoder, symbol);
             }
             else
             {
-                symbol -= LzmaBase.NumLowLenSymbols;
+                symbol -= NumLowLenSymbols;
                 this.firstChoice.Encode(rangeEncoder, 1);
-                if (symbol < LzmaBase.NumMidLenSymbols)
+                if (symbol < NumMidLenSymbols)
                 {
                     this.secondChoice.Encode(rangeEncoder, 0);
                     this.midCoder[posState].Encode(rangeEncoder, symbol);
@@ -1613,7 +1618,7 @@ public class LzmaEncoder
                 else
                 {
                     this.secondChoice.Encode(rangeEncoder, 1);
-                    this.highCoder.Encode(rangeEncoder, symbol - LzmaBase.NumMidLenSymbols);
+                    this.highCoder.Encode(rangeEncoder, symbol - NumMidLenSymbols);
                 }
             }
         }
@@ -1625,7 +1630,7 @@ public class LzmaEncoder
             var b0 = a1 + this.secondChoice.GetPrice0();
             var b1 = a1 + this.secondChoice.GetPrice1();
             uint i;
-            for (i = 0U; i < LzmaBase.NumLowLenSymbols; i++)
+            for (i = 0U; i < NumLowLenSymbols; i++)
             {
                 if (i >= numSymbols)
                 {
@@ -1635,27 +1640,27 @@ public class LzmaEncoder
                 prices[st + i] = a0 + this.lowCoder[posState].GetPrice(i);
             }
 
-            for (; i < LzmaBase.NumLowLenSymbols + LzmaBase.NumMidLenSymbols; i++)
+            for (; i < NumLowLenSymbols + NumMidLenSymbols; i++)
             {
                 if (i >= numSymbols)
                 {
                     return;
                 }
 
-                prices[st + i] = b0 + this.midCoder[posState].GetPrice(i - LzmaBase.NumLowLenSymbols);
+                prices[st + i] = b0 + this.midCoder[posState].GetPrice(i - NumLowLenSymbols);
             }
 
             for (; i < numSymbols; i++)
             {
-                prices[st + i] = b1 + this.highCoder.GetPrice(i - LzmaBase.NumLowLenSymbols - LzmaBase.NumMidLenSymbols);
+                prices[st + i] = b1 + this.highCoder.GetPrice(i - NumLowLenSymbols - NumMidLenSymbols);
             }
         }
     }
 
     private sealed class LenPriceTableEncoder : LenEncoder
     {
-        private readonly uint[] prices = new uint[LzmaBase.NumLenSymbols << LzmaBase.NumPosStatesBitsEncodingMax];
-        private readonly uint[] counters = new uint[LzmaBase.NumPosStatesEncodingMax];
+        private readonly uint[] prices = new uint[NumLenSymbols << NumPosStatesBitsEncodingMax];
+        private readonly uint[] counters = new uint[NumPosStatesEncodingMax];
         private uint tableSize;
 
         public LenPriceTableEncoder()
@@ -1665,7 +1670,7 @@ public class LzmaEncoder
 
         public void SetTableSize(uint tableSize) => this.tableSize = tableSize;
 
-        public uint GetPrice(uint symbol, uint posState) => this.prices[(posState * LzmaBase.NumLenSymbols) + symbol];
+        public uint GetPrice(uint symbol, uint posState) => this.prices[(posState * NumLenSymbols) + symbol];
 
         public void UpdateTables(uint numPosStates)
         {
@@ -1686,14 +1691,14 @@ public class LzmaEncoder
 
         private void UpdateTable(uint posState)
         {
-            this.SetPrices(posState, this.tableSize, this.prices, posState * LzmaBase.NumLenSymbols);
+            this.SetPrices(posState, this.tableSize, this.prices, posState * NumLenSymbols);
             this.counters[posState] = this.tableSize;
         }
     }
 
     private sealed class Optimal
     {
-        public LzmaBase.State State { get; set; }
+        public State State { get; set; }
 
         public bool Prev1IsChar { get; set; }
 

@@ -6,6 +6,8 @@
 
 namespace System.IO.Compression;
 
+using static System.IO.Compression.Constants;
+
 /// <summary>
 /// The LZMA decoder.
 /// </summary>
@@ -14,22 +16,22 @@ internal class LzmaDecoder
     private readonly LZ.OutWindow outWindow = new();
     private readonly RangeCoder.Decoder rangeDecoder = new();
 
-    private readonly RangeCoder.BitDecoder[] isMatchDecoders = new RangeCoder.BitDecoder[LzmaBase.NumStates << LzmaBase.NumPosStatesBitsMax];
-    private readonly RangeCoder.BitDecoder[] isRepDecoders = new RangeCoder.BitDecoder[LzmaBase.NumStates];
-    private readonly RangeCoder.BitDecoder[] isRepG0Decoders = new RangeCoder.BitDecoder[LzmaBase.NumStates];
-    private readonly RangeCoder.BitDecoder[] isRepG1Decoders = new RangeCoder.BitDecoder[LzmaBase.NumStates];
-    private readonly RangeCoder.BitDecoder[] isRepG2Decoders = new RangeCoder.BitDecoder[LzmaBase.NumStates];
-    private readonly RangeCoder.BitDecoder[] isRep0LongDecoders = new RangeCoder.BitDecoder[LzmaBase.NumStates << LzmaBase.NumPosStatesBitsMax];
+    private readonly RangeCoder.BitDecoder[] matchDecoders = new RangeCoder.BitDecoder[NumStates << NumPosStatesBitsMax];
+    private readonly RangeCoder.BitDecoder[] repDecoders = new RangeCoder.BitDecoder[NumStates];
+    private readonly RangeCoder.BitDecoder[] repG0Decoders = new RangeCoder.BitDecoder[NumStates];
+    private readonly RangeCoder.BitDecoder[] repG1Decoders = new RangeCoder.BitDecoder[NumStates];
+    private readonly RangeCoder.BitDecoder[] repG2Decoders = new RangeCoder.BitDecoder[NumStates];
+    private readonly RangeCoder.BitDecoder[] rep0LongDecoders = new RangeCoder.BitDecoder[NumStates << NumPosStatesBitsMax];
 
-    private readonly RangeCoder.BitTreeDecoder[] posSlotDecoder = new RangeCoder.BitTreeDecoder[LzmaBase.NumLenToPosStates];
-    private readonly RangeCoder.BitDecoder[] posDecoders = new RangeCoder.BitDecoder[LzmaBase.NumFullDistances - LzmaBase.EndPosModelIndex];
+    private readonly RangeCoder.BitTreeDecoder[] posSlotDecoder = new RangeCoder.BitTreeDecoder[NumLenToPosStates];
+    private readonly RangeCoder.BitDecoder[] posDecoders = new RangeCoder.BitDecoder[NumFullDistances - EndPosModelIndex];
 
     private readonly LenDecoder lenDecoder = new();
     private readonly LenDecoder repLenDecoder = new();
 
     private readonly LiteralDecoder literalDecoder = new();
 
-    private readonly RangeCoder.BitTreeDecoder posAlignDecoder = new(LzmaBase.NumAlignBits);
+    private readonly RangeCoder.BitTreeDecoder posAlignDecoder = new(NumAlignBits);
 
     private uint dictionarySize;
     private uint dictionarySizeCheck;
@@ -45,9 +47,9 @@ internal class LzmaDecoder
     public LzmaDecoder(byte[] properties)
     {
         this.dictionarySize = uint.MaxValue;
-        for (var i = 0; i < LzmaBase.NumLenToPosStates; i++)
+        for (var i = 0; i < NumLenToPosStates; i++)
         {
-            this.posSlotDecoder[i] = new(LzmaBase.NumPosSlotBits);
+            this.posSlotDecoder[i] = new(NumPosSlotBits);
         }
 
         SetDecoderProperties(properties);
@@ -63,7 +65,7 @@ internal class LzmaDecoder
             var remainder = properties[0] / 9;
             var lp = remainder % 5;
             var pb = remainder / 5;
-            if (pb > LzmaBase.NumPosStatesBitsMax)
+            if (pb > NumPosStatesBitsMax)
             {
                 throw new InvalidDataException();
             }
@@ -106,7 +108,7 @@ internal class LzmaDecoder
 
             void SetPosBitsProperties(int pb)
             {
-                if (pb > LzmaBase.NumPosStatesBitsMax)
+                if (pb > NumPosStatesBitsMax)
                 {
                     throw new InvalidDataException();
                 }
@@ -129,8 +131,7 @@ internal class LzmaDecoder
     {
         this.Init(input, output);
 
-        LzmaBase.State state = default;
-        state.Init();
+        var state = new State();
         var rep0 = 0U;
         var rep1 = 0U;
         var rep2 = 0U;
@@ -140,7 +141,7 @@ internal class LzmaDecoder
         var outSize64 = (ulong)outputSize;
         if (nowPos64 < outSize64)
         {
-            if (this.isMatchDecoders[state.Index << LzmaBase.NumPosStatesBitsMax].Decode(this.rangeDecoder) is not 0U)
+            if (this.matchDecoders[state.Index << NumPosStatesBitsMax].Decode(this.rangeDecoder) is not 0U)
             {
                 throw new InvalidDataException();
             }
@@ -154,7 +155,7 @@ internal class LzmaDecoder
         while (nowPos64 < outSize64)
         {
             var posState = (uint)nowPos64 & this.posStateMask;
-            if (this.isMatchDecoders[(state.Index << LzmaBase.NumPosStatesBitsMax) + posState].Decode(this.rangeDecoder) is 0)
+            if (this.matchDecoders[(state.Index << NumPosStatesBitsMax) + posState].Decode(this.rangeDecoder) is 0)
             {
                 var prevByte = this.outWindow.GetByte(0);
                 var b = state.IsCharState()
@@ -167,11 +168,11 @@ internal class LzmaDecoder
             else
             {
                 uint len;
-                if (this.isRepDecoders[state.Index].Decode(this.rangeDecoder) is 1U)
+                if (this.repDecoders[state.Index].Decode(this.rangeDecoder) is 1U)
                 {
-                    if (this.isRepG0Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
+                    if (this.repG0Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
                     {
-                        if (this.isRep0LongDecoders[(state.Index << LzmaBase.NumPosStatesBitsMax) + posState].Decode(this.rangeDecoder) is 0U)
+                        if (this.rep0LongDecoders[(state.Index << NumPosStatesBitsMax) + posState].Decode(this.rangeDecoder) is 0U)
                         {
                             state.UpdateShortRep();
                             this.outWindow.PutByte(this.outWindow.GetByte(rep0));
@@ -182,13 +183,13 @@ internal class LzmaDecoder
                     else
                     {
                         uint distance;
-                        if (this.isRepG1Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
+                        if (this.repG1Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
                         {
                             distance = rep1;
                         }
                         else
                         {
-                            if (this.isRepG2Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
+                            if (this.repG2Decoders[state.Index].Decode(this.rangeDecoder) is 0U)
                             {
                                 distance = rep2;
                             }
@@ -205,7 +206,7 @@ internal class LzmaDecoder
                         rep0 = distance;
                     }
 
-                    len = this.repLenDecoder.Decode(this.rangeDecoder, posState) + LzmaBase.MatchMinLen;
+                    len = this.repLenDecoder.Decode(this.rangeDecoder, posState) + MatchMinLen;
                     state.UpdateRep();
                 }
                 else
@@ -213,20 +214,20 @@ internal class LzmaDecoder
                     rep3 = rep2;
                     rep2 = rep1;
                     rep1 = rep0;
-                    len = LzmaBase.MatchMinLen + this.lenDecoder.Decode(this.rangeDecoder, posState);
+                    len = MatchMinLen + this.lenDecoder.Decode(this.rangeDecoder, posState);
                     state.UpdateMatch();
-                    var posSlot = this.posSlotDecoder[LzmaBase.GetLenToPosState(len)].Decode(this.rangeDecoder);
-                    if (posSlot >= LzmaBase.StartPosModelIndex)
+                    var posSlot = this.posSlotDecoder[GetLenToPosState(len)].Decode(this.rangeDecoder);
+                    if (posSlot >= StartPosModelIndex)
                     {
                         var numDirectBits = (int)((posSlot >> 1) - 1);
                         rep0 = (2 | (posSlot & 1)) << numDirectBits;
-                        if (posSlot < LzmaBase.EndPosModelIndex)
+                        if (posSlot < EndPosModelIndex)
                         {
                             rep0 += RangeCoder.BitTreeDecoder.ReverseDecode(this.posDecoders, rep0 - posSlot - 1, this.rangeDecoder, numDirectBits);
                         }
                         else
                         {
-                            rep0 += this.rangeDecoder.DecodeDirectBits(numDirectBits - LzmaBase.NumAlignBits) << LzmaBase.NumAlignBits;
+                            rep0 += this.rangeDecoder.DecodeDirectBits(numDirectBits - NumAlignBits) << NumAlignBits;
                             rep0 += this.posAlignDecoder.ReverseDecode(this.rangeDecoder);
                         }
                     }
@@ -272,28 +273,28 @@ internal class LzmaDecoder
         this.rangeDecoder.Init(inStream);
         this.outWindow.Init(outStream, this.solid);
 
-        for (var i = 0U; i < LzmaBase.NumStates; i++)
+        for (var i = 0U; i < NumStates; i++)
         {
             for (var j = 0U; j <= this.posStateMask; j++)
             {
-                var index = (i << LzmaBase.NumPosStatesBitsMax) + j;
-                this.isMatchDecoders[index].Init();
-                this.isRep0LongDecoders[index].Init();
+                var index = (i << NumPosStatesBitsMax) + j;
+                this.matchDecoders[index].Init();
+                this.rep0LongDecoders[index].Init();
             }
 
-            this.isRepDecoders[i].Init();
-            this.isRepG0Decoders[i].Init();
-            this.isRepG1Decoders[i].Init();
-            this.isRepG2Decoders[i].Init();
+            this.repDecoders[i].Init();
+            this.repG0Decoders[i].Init();
+            this.repG1Decoders[i].Init();
+            this.repG2Decoders[i].Init();
         }
 
         this.literalDecoder.Init();
-        for (var i = 0U; i < LzmaBase.NumLenToPosStates; i++)
+        for (var i = 0U; i < NumLenToPosStates; i++)
         {
             this.posSlotDecoder[i].Init();
         }
 
-        for (var i = 0U; i < LzmaBase.NumFullDistances - LzmaBase.EndPosModelIndex; i++)
+        for (var i = 0U; i < NumFullDistances - EndPosModelIndex; i++)
         {
             this.posDecoders[i].Init();
         }
@@ -305,9 +306,9 @@ internal class LzmaDecoder
 
     private sealed class LenDecoder
     {
-        private readonly RangeCoder.BitTreeDecoder[] lowCoder = new RangeCoder.BitTreeDecoder[LzmaBase.NumPosStatesMax];
-        private readonly RangeCoder.BitTreeDecoder[] midCoder = new RangeCoder.BitTreeDecoder[LzmaBase.NumPosStatesMax];
-        private readonly RangeCoder.BitTreeDecoder highCoder = new(LzmaBase.NumHighLenBits);
+        private readonly RangeCoder.BitTreeDecoder[] lowCoder = new RangeCoder.BitTreeDecoder[NumPosStatesMax];
+        private readonly RangeCoder.BitTreeDecoder[] midCoder = new RangeCoder.BitTreeDecoder[NumPosStatesMax];
+        private readonly RangeCoder.BitTreeDecoder highCoder = new(NumHighLenBits);
         private RangeCoder.BitDecoder firstChoice = default;
         private RangeCoder.BitDecoder secondChoice = default;
         private uint numPosStates;
@@ -316,8 +317,8 @@ internal class LzmaDecoder
         {
             for (var posState = this.numPosStates; posState < numPosStates; posState++)
             {
-                this.lowCoder[posState] = new(LzmaBase.NumLowLenBits);
-                this.midCoder[posState] = new(LzmaBase.NumMidLenBits);
+                this.lowCoder[posState] = new(NumLowLenBits);
+                this.midCoder[posState] = new(NumMidLenBits);
             }
 
             this.numPosStates = numPosStates;
@@ -343,14 +344,14 @@ internal class LzmaDecoder
                 return this.lowCoder[posState].Decode(rangeDecoder);
             }
 
-            var symbol = LzmaBase.NumLowLenSymbols;
+            var symbol = NumLowLenSymbols;
             if (this.secondChoice.Decode(rangeDecoder) is 0U)
             {
                 symbol += this.midCoder[posState].Decode(rangeDecoder);
             }
             else
             {
-                symbol += LzmaBase.NumMidLenSymbols;
+                symbol += NumMidLenSymbols;
                 symbol += this.highCoder.Decode(rangeDecoder);
             }
 
