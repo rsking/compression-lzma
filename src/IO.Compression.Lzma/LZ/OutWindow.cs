@@ -51,7 +51,7 @@ internal sealed class OutWindow
         {
             if (stream is MemoryStream memoryStream)
             {
-                var field = memoryStream.GetType().GetField("_expandable", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                var field = memoryStream.GetType().GetField("_expandable", Reflection.BindingFlags.Instance | Reflection.BindingFlags.NonPublic);
                 return field?.GetValue(memoryStream) is not bool b || b;
             }
 
