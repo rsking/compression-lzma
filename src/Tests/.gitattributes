@@ -1,0 +1,5 @@
+# Set TXT files to CRLF to ensure consistent encoding
+*.txt			text=crlf
+
+# Set LMZA files to be binary
+*.lzma			binary
