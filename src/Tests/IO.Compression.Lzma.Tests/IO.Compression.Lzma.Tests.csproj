@@ -8,6 +8,8 @@
     <IsPackable>false</IsPackable>
     <RootNamespace>System.IO.Compression.Tests</RootNamespace>
     <AssemblyName>KingR.$(AssemblyName)</AssemblyName>
+    <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,18 +21,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.2" />
     <PackageReference Include="GitHubActionsTestLogger" Version="2.4.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
-    <PackageReference Include="xunit" Version="2.9.2" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Using Include="Xunit" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="17.14.2" />
+    <PackageReference Include="Microsoft.Testing.Platform.MSBuild" Version="1.6.3" />
+    <PackageReference Include="TUnit" Version="0.18.52" />
   </ItemGroup>
 
   <ItemGroup>
@@ -80,8 +77,7 @@ if (Files.Length > 0)
 
 
 
-  <Target Name="_UpdateEmbeddedResources"
-          BeforeTargets="AssignTargetPaths">
+  <Target Name="_UpdateEmbeddedResources" BeforeTargets="AssignTargetPaths">
 
     <ChangeLineEndings Files="@(_TxtEmbeddedResource)" DestinationFolder="$(IntermediateOutputPath)">
       <Output ItemName="TxtEmbeddedResource" TaskParameter="Result" />

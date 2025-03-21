@@ -8,12 +8,12 @@ namespace System.IO.Compression.Tests;
 
 public class LzmaCompressionOptionsTests
 {
-    [Fact]
-    public void FromDefaultOptions()
+    [Test]
+    public async Task FromDefaultOptions()
     {
         var defaultProperties = LzmaEncoderTests.GetDefaultProperties();
         var defaultFromOptions = new LzmaCompressionOptions().ToDictionary();
 
-        Assert.Equal(defaultProperties, defaultFromOptions);
+        await Assert.That(defaultProperties).IsEquivalentTo(defaultFromOptions);
     }
 }

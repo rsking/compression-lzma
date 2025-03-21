@@ -32,8 +32,8 @@ public class LzmaEncoderTests
         };
     }
 
-    [Fact]
-    public void Encode()
+    [Test]
+    public async Task Encode()
     {
         var encoder = new LzmaEncoder(GetDefaultProperties());
 
@@ -42,9 +42,9 @@ public class LzmaEncoderTests
 
         using (var input = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.txt"))
         {
-            Assert.NotNull(input);
+            await Assert.That(input).IsNotNull();
 
-            var fileSize = input.Length;
+            var fileSize = input!.Length;
 
             for (var i = 0; i < 8; i++)
             {
@@ -59,8 +59,8 @@ public class LzmaEncoderTests
         // compare the streams
         using var lzma = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.lzma");
 
-        Assert.NotNull(lzma);
-        Assert.Equal(output.Length, lzma.Length);
+        await Assert.That(lzma).IsNotNull();
+        await Assert.That(lzma!.Length).IsEqualTo(output.Length);
 
         var bytesLeft = output.Length - output.Position;
         while (bytesLeft > 0)
@@ -72,13 +72,13 @@ public class LzmaEncoderTests
 
             var bytesRead = output.Read(first, 0, bytesToRead);
 
-            Assert.Equal(bytesRead, bytesToRead);
+            await Assert.That(bytesRead).IsEqualTo(bytesToRead);
 
             bytesRead = lzma.Read(second, 0, bytesToRead);
 
-            Assert.Equal(bytesRead, bytesToRead);
+            await Assert.That(bytesRead).IsEqualTo(bytesToRead);
 
-            Assert.Equal(first, second);
+            await Assert.That(first).IsEquivalentTo(second);
 
             bytesLeft -= bytesRead;
         }
