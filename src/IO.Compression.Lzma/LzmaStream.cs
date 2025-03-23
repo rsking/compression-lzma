@@ -44,20 +44,23 @@ public sealed class LzmaStream : Stream
         }
         else if (mode is CompressionMode.Decompress && this.stream.CanRead)
         {
-            var properties = new byte[5];
-            _ = this.stream.Read(properties, 0, properties.Length);
+            const int PropertiesSize = 5;
+            const int OutputSize = 8;
+            var properties = new byte[PropertiesSize];
+            _ = this.stream.Read(properties, 0, PropertiesSize);
             this.decoder = new(properties);
 
             var outputSize = 0L;
-            for (var i = 0; i < 8; i++)
+            var bytes = new byte[OutputSize];
+            if (stream.Read(bytes, 0, OutputSize) is not OutputSize)
             {
-                var v = stream.ReadByte();
-                if (v < 0)
-                {
-                    throw new InvalidOperationException("Can't Read 1");
-                }
+                throw new InvalidOperationException("Failed to read the output size.");
+            }
 
-                outputSize |= ((long)(byte)v) << (8 * i);
+            for (var i = 0; i < OutputSize; i++)
+            {
+                var v = bytes[i];
+                outputSize |= (long)v << (8 * i);
             }
 
             this.decoder.SetInputStream(stream);
