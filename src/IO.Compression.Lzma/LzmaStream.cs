@@ -28,7 +28,7 @@ public sealed class LzmaStream : Stream
     /// <param name="mode">One of the enumeration values that indicates whether to compress data to the stream or decompress data from the stream.</param>
     /// <param name="leaveOpen"><see langword="true"/> to leave the stream open after disposing the <see cref="LzmaStream"/> object; otherwise, <see langword="false"/>.</param>
     /// <exception cref="ArgumentNullException"><paramref name="stream"/> is <see langword="null"/>.</exception>
-    public LzmaStream(Stream stream, System.IO.Compression.CompressionMode mode, bool leaveOpen = false)
+    public LzmaStream(Stream stream, CompressionMode mode, bool leaveOpen = false)
     {
         if (stream is null)
         {
@@ -37,12 +37,12 @@ public sealed class LzmaStream : Stream
 
         this.stream = stream;
         this.leaveOpen = leaveOpen;
-        if (mode is System.IO.Compression.CompressionMode.Compress && this.stream.CanWrite)
+        if (mode is CompressionMode.Compress && this.stream.CanWrite)
         {
             this.encoder = new LzmaCompressionOptions().CreateEncoder();
             this.encoder.WriteCoderProperties(this.stream);
         }
-        else if (mode is System.IO.Compression.CompressionMode.Decompress && this.stream.CanRead)
+        else if (mode is CompressionMode.Decompress && this.stream.CanRead)
         {
             var properties = new byte[5];
             _ = this.stream.Read(properties, 0, properties.Length);
@@ -98,7 +98,7 @@ public sealed class LzmaStream : Stream
     public override bool CanRead => this.decoder is not null && this.stream.CanRead;
 
     /// <inheritdoc/>
-    public override bool CanSeek => this.stream.CanSeek;
+    public override bool CanSeek => false;
 
     /// <inheritdoc/>
     public override bool CanWrite => this.encoder is not null && this.stream.CanWrite;
