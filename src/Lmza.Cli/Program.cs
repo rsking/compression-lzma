@@ -7,45 +7,45 @@
 using System.IO.Compression;
 using Lmza.Cli;
 
-var inputArgument = new CliArgument<FileInfo>("INPUT").AcceptExistingOnly();
-var outputArgument = new CliArgument<FileInfo>("OUTPUT");
+var inputArgument = new Argument<FileInfo>("INPUT").AcceptExistingOnly();
+var outputArgument = new Argument<FileInfo>("OUTPUT");
 
-var dictionaryOption = new CliOption<int>("-d")
+var dictionaryOption = new Option<int>("-d")
 {
     Description = "set dictionary - [0, 29]",
     DefaultValueFactory = _ => 23,
     Validators = { CreateNumberValidator(0, 29) },
 };
 
-var numFastBytesOption = new CliOption<int>("-fb")
+var numFastBytesOption = new Option<int>("-fb")
 {
     Description = "set number of fast bytes - [5, 273]",
     DefaultValueFactory = _ => 128,
     Validators = { CreateNumberValidator(5, 273) },
 };
 
-var litContextBitsOption = new CliOption<int>("-lc")
+var litContextBitsOption = new Option<int>("-lc")
 {
     Description = "set number of literal context bits - [0, 8]",
     DefaultValueFactory = _ => 3,
     Validators = { CreateNumberValidator(0, 8) },
 };
 
-var litPosBitsOptions = new CliOption<int>("-lp")
+var litPosBitsOptions = new Option<int>("-lp")
 {
     Description = "set number of literal pos bits - [0, 4]",
     DefaultValueFactory = _ => 0,
     Validators = { CreateNumberValidator(0, 4) },
 };
 
-var posBitsOption = new CliOption<int>("-pb")
+var posBitsOption = new Option<int>("-pb")
 {
     Description = "set number of pos bits - [0, 4]",
     DefaultValueFactory = _ => 2,
     Validators = { CreateNumberValidator(0, 4) },
 };
 
-var matchFinderOption = new CliOption<string>("-mf")
+var matchFinderOption = new Option<string>("-mf")
 {
     HelpName = "MF_ID",
     Description = "set Match Finder: [bt2, bt4]",
@@ -53,7 +53,7 @@ var matchFinderOption = new CliOption<string>("-mf")
 };
 matchFinderOption.AcceptOnlyFromAmong("bt2", "bt4");
 
-var eosOption = new CliOption<bool>("-eos")
+var eosOption = new Option<bool>("-eos")
 {
     Description = "write End Of Stream marker",
 };
@@ -73,7 +73,7 @@ static Action<System.CommandLine.Parsing.OptionResult> CreateNumberValidator<T>(
     });
 }
 
-var encodeCommand = new CliCommand("encode")
+var encodeCommand = new Command("encode")
 {
     inputArgument,
     outputArgument,
@@ -131,7 +131,7 @@ encodeCommand.SetAction(parseResult =>
     }
 });
 
-var decodeCommand = new CliCommand("decode")
+var decodeCommand = new Command("decode")
 {
     inputArgument,
     outputArgument,
@@ -166,9 +166,9 @@ decodeCommand.SetAction(parseResult =>
     decoder.Decode(input, output, outputSize);
 });
 
-var iterationOption = new CliOption<int>("-i") { DefaultValueFactory = _ => 10 };
+var iterationOption = new Option<int>("-i") { DefaultValueFactory = _ => 10 };
 
-var benchmarkCommand = new CliCommand("benchmark")
+var benchmarkCommand = new Command("benchmark")
 {
     dictionaryOption,
     iterationOption,
@@ -182,12 +182,12 @@ benchmarkCommand.SetAction(parseResult =>
     _ = Benchmark.Run(numIterations, dictionary);
 });
 
-var rootCommand = new CliRootCommand
+var rootCommand = new RootCommand
 {
     encodeCommand,
     decodeCommand,
     benchmarkCommand,
 };
 
-var configuration = new CliConfiguration(rootCommand);
+var configuration = new CommandLineConfiguration(rootCommand);
 await configuration.InvokeAsync(args).ConfigureAwait(false);
