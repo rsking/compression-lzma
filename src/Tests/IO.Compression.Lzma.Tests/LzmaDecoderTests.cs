@@ -14,7 +14,7 @@ public class LzmaDecoderTests
         using var lzma = typeof(LzmaDecoderTests).Assembly.GetManifestResourceStream(typeof(LzmaDecoderTests), "lorem-ipsum.lzma");
 
         await Assert.That(lzma).IsNotNull();
-        
+
         var properties = new byte[5];
         _ = lzma!.Read(properties, 0, 5);
 

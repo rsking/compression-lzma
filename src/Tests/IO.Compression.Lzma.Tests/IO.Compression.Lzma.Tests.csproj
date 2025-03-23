@@ -10,6 +10,7 @@
     <AssemblyName>KingR.$(AssemblyName)</AssemblyName>
     <SuppressTfmSupportBuildWarnings>true</SuppressTfmSupportBuildWarnings>
     <OutputType>Exe</OutputType>
+    <NoWarn>$(NoWarn);CA1822</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,7 +28,7 @@
     </PackageReference>
     <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="17.14.2" />
     <PackageReference Include="Microsoft.Testing.Platform.MSBuild" Version="1.6.3" />
-    <PackageReference Include="TUnit" Version="0.18.52" />
+    <PackageReference Include="TUnit" Version="0.18.60" />
   </ItemGroup>
 
   <ItemGroup>

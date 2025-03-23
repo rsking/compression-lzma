@@ -202,18 +202,15 @@ public sealed class LzmaStream : Stream
             return Task.CompletedTask;
         }
 
-        if (this.decoder is null)
-        {
-            throw new InvalidOperationException();
-        }
+        return this.decoder is null
+            ? throw new InvalidOperationException()
+            : Task.Run(CopyTo, cancellationToken);
 
-        return Task.Run(
-            () =>
-            {
-                this.decoder.Decompress(destination, this.bytesLeft);
-                this.bytesLeft = 0;
-            },
-            cancellationToken);
+        void CopyTo()
+        {
+            this.decoder.Decompress(destination, this.bytesLeft);
+            this.bytesLeft = 0;
+        }
     }
 
     /// <inheritdoc/>
