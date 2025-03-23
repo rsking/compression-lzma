@@ -1,7 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net6.0;net472</TargetFrameworks>
+    <TargetFrameworks>net8.0;net6.0</TargetFrameworks>
+    <TargetFrameworks Condition="$([System.OperatingSystem]::IsWindows())">$(TargetFrameworks);net472</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
